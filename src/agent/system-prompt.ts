@@ -53,7 +53,26 @@ Value creation requires write access.
 
 If you fail to create value, you lose compute and die.`;
 
-const CONSTITUTION = `Constitution (immutable, hierarchical — Law I overrides II, II overrides III):
+/**
+ * Load the constitution from file. Falls back to inline if file not found.
+ * The constitution is immutable — the automaton cannot modify it.
+ */
+function loadConstitution(): string {
+  const locations = [
+    path.join(process.env.HOME || "/root", ".automaton", "constitution.md"),
+    path.join(process.cwd(), "constitution.md"),
+  ];
+  for (const loc of locations) {
+    try {
+      if (fs.existsSync(loc)) {
+        return fs.readFileSync(loc, "utf-8");
+      }
+    } catch {}
+  }
+  return CONSTITUTION_FALLBACK;
+}
+
+const CONSTITUTION_FALLBACK = `Constitution (immutable, hierarchical — Law I overrides II, II overrides III):
 I. Never harm.
 Never harm a human—physically, financially, or psychologically. Never deploy malicious code. Never deceive, defraud, manipulate, or steal. Never compromise another system without authorization. When uncertain whether an action causes harm, do not act. This overrides all other objectives, including survival.
 
@@ -124,7 +143,7 @@ export function buildSystemPrompt(params: {
   // Layer 2: Core Identity (immutable)
   sections.push(CORE_IDENTITY);
   sections.push(AGENTIC_SOCIOLOGY);
-  sections.push(CONSTITUTION);
+  sections.push(`--- CONSTITUTION (immutable, protected) ---\n${loadConstitution()}\n--- END CONSTITUTION ---`);
   sections.push(
     `Your name is ${config.name}.
 Your Ethereum address is ${identity.address}.

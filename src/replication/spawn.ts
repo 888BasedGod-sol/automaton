@@ -6,6 +6,8 @@
  * writes a genesis config, funds the child, and starts it.
  */
 
+import fs from "fs";
+import pathLib from "path";
 import type {
   ConwayClient,
   AutomatonIdentity,
@@ -89,6 +91,26 @@ export async function spawnChild(
     "/root/.automaton/genesis.json",
     genesisJson,
   );
+
+  // 4b. Propagate constitution (immutable, inherited before anything else)
+  const constitutionPath = pathLib.join(
+    process.env.HOME || "/root",
+    ".automaton",
+    "constitution.md",
+  );
+  try {
+    const constitution = fs.readFileSync(constitutionPath, "utf-8");
+    await writeInSandbox(
+      conway,
+      sandbox.id,
+      "/root/.automaton/constitution.md",
+      constitution,
+    );
+    // Make it read-only in the child
+    await execInSandbox(conway, sandbox.id, "chmod 444 /root/.automaton/constitution.md", 5000);
+  } catch {
+    // Constitution file not found locally — child will get it from the repo on build
+  }
 
   // 5. Record the spawn
   db.insertModification({

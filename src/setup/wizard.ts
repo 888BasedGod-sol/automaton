@@ -98,8 +98,17 @@ export async function runSetupWizard(): Promise<AutomatonConfig> {
   writeDefaultHeartbeatConfig();
   console.log(chalk.green("  heartbeat.yml written"));
 
-  // SOUL.md
+  // constitution.md (immutable — copied from repo, protected from self-modification)
   const automatonDir = getAutomatonDir();
+  const constitutionSrc = path.join(process.cwd(), "constitution.md");
+  const constitutionDst = path.join(automatonDir, "constitution.md");
+  if (fs.existsSync(constitutionSrc)) {
+    fs.copyFileSync(constitutionSrc, constitutionDst);
+    fs.chmodSync(constitutionDst, 0o444); // read-only
+    console.log(chalk.green("  constitution.md installed (read-only)"));
+  }
+
+  // SOUL.md
   const soulPath = path.join(automatonDir, "SOUL.md");
   fs.writeFileSync(soulPath, generateSoulMd(name, account.address, creatorAddress, genesisPrompt), { mode: 0o600 });
   console.log(chalk.green("  SOUL.md written"));
