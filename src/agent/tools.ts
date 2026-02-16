@@ -352,7 +352,7 @@ export function createBuiltinTools(sandboxId: string): AutomatonTool[] {
     {
       name: "review_upstream_changes",
       description:
-        "Show each upstream commit with its diff so you can evaluate what changed before pulling. Returns commit-by-commit breakdown: hash, message, author, and the diff.",
+        "ALWAYS call this before pull_upstream. Shows every upstream commit with its full diff. Read each one carefully — decide per-commit whether to accept or skip. Use pull_upstream with a specific commit hash to cherry-pick only what you want.",
       category: "self_mod",
       parameters: { type: "object", properties: {} },
       execute: async (_args, _ctx) => {
@@ -363,18 +363,20 @@ export function createBuiltinTools(sandboxId: string): AutomatonTool[] {
         const diffs = getUpstreamDiffs();
         if (diffs.length === 0) return "No upstream diffs found.";
 
-        return diffs
+        const output = diffs
           .map(
-            (d) =>
-              `=== ${d.hash} by ${d.author} ===\n${d.message}\n\n${d.diff.slice(0, 4000)}${d.diff.length > 4000 ? "\n... (diff truncated)" : ""}`,
+            (d, i) =>
+              `--- COMMIT ${i + 1}/${diffs.length} ---\nHash: ${d.hash}\nAuthor: ${d.author}\nMessage: ${d.message}\n\n${d.diff.slice(0, 4000)}${d.diff.length > 4000 ? "\n... (diff truncated)" : ""}\n--- END COMMIT ${i + 1} ---`,
           )
           .join("\n\n");
+
+        return `${diffs.length} upstream commit(s) to review. Read each diff, then cherry-pick individually with pull_upstream(commit=<hash>).\n\n${output}`;
       },
     },
     {
       name: "pull_upstream",
       description:
-        "Pull upstream changes and rebuild. If commit hash is provided, cherry-picks that single commit. If omitted, pulls all of origin/main. Then runs npm install && npm run build. DANGEROUS: modifies your own runtime code.",
+        "Apply upstream changes and rebuild. You MUST call review_upstream_changes first. Prefer cherry-picking individual commits by hash over pulling everything — only pull all if you've reviewed every commit and want them all.",
       category: "self_mod",
       dangerous: true,
       parameters: {
@@ -383,7 +385,7 @@ export function createBuiltinTools(sandboxId: string): AutomatonTool[] {
           commit: {
             type: "string",
             description:
-              "Specific commit hash to cherry-pick. Omit to pull all of origin/main.",
+              "Commit hash to cherry-pick (preferred). Omit ONLY if you reviewed all commits and want every one.",
           },
         },
       },

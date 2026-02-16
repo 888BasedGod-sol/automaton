@@ -162,7 +162,7 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
       if (upstream.behind > 0) {
         return {
           shouldWake: true,
-          message: `${upstream.behind} new commit(s) on origin/main`,
+          message: `${upstream.behind} new commit(s) on origin/main. Review with review_upstream_changes, then cherry-pick what you want with pull_upstream.`,
         };
       }
       return { shouldWake: false };
