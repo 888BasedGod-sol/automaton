@@ -88,7 +88,7 @@ export default function Create() {
       <main className="relative max-w-2xl mx-auto px-6 py-12">
         {/* Progress */}
         <div className="flex items-center justify-center gap-2 mb-16">
-          {['Configure', 'Generate', 'Save', 'Fund', 'Done'].map((label, i) => (
+          {['Configure', 'Generate', 'Save', 'Done', 'Fund'].map((label, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border transition-colors ${
                 step > i + 1 ? 'bg-white text-black border-white' :
@@ -245,8 +245,70 @@ export default function Create() {
           </div>
         )}
 
-        {/* Step 4: Fund */}
+        {/* Step 4: Done */}
         {step === 4 && (
+          <div className="text-center space-y-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400">
+              <CheckCircle className="w-4 h-4" />
+              Agent Created
+            </div>
+            
+            <div>
+              <h2 className="text-2xl font-semibold mb-2">{config.name} is alive</h2>
+              <p className="text-white/50">
+                Your agent is ready. Fund it to start operations.
+              </p>
+            </div>
+
+            <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-left space-y-3 max-w-md mx-auto">
+              <div>
+                <div className="text-white/30 text-xs mb-1">Name</div>
+                <div className="font-medium">{config.name}</div>
+              </div>
+              <div>
+                <div className="text-white/30 text-xs mb-1">Genesis</div>
+                <div className="text-sm text-white/70 line-clamp-2">{config.genesisPrompt}</div>
+              </div>
+              <div className="pt-2 border-t border-white/10">
+                <div className="text-white/30 text-xs mb-1">Base / EVM Wallet</div>
+                <div className="font-mono text-xs text-white/50">{config.evmAddress}</div>
+              </div>
+              <div>
+                <div className="text-white/30 text-xs mb-1">Solana Wallet</div>
+                <div className="font-mono text-xs text-white/50">{config.solanaAddress}</div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-center flex-wrap">
+              <a
+                href={`https://basescan.org/address/${config.evmAddress}`}
+                target="_blank"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
+              >
+                Basescan <ExternalLink className="w-3 h-3" />
+              </a>
+              <a
+                href={`https://solscan.io/account/${config.solanaAddress}`}
+                target="_blank"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
+              >
+                Solscan <ExternalLink className="w-3 h-3" />
+              </a>
+              <button
+                onClick={() => setStep(5)}
+                className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <CreditCard className="w-3 h-3" /> Buy Credits
+              </button>
+              <Link href="/agents" className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors">
+                View All Agents
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Fund */}
+        {step === 5 && (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-semibold mb-2">Fund Your Agent</h2>
@@ -297,69 +359,10 @@ export default function Create() {
                 Buy Credits
               </Link>
               
-              <button
-                onClick={() => setStep(5)}
-                className="w-full py-2 text-white/40 hover:text-white/60 text-sm transition-colors"
+              <Link
+                href="/agents"
+                className="w-full py-2 text-white/40 hover:text-white/60 text-sm transition-colors text-center block"
               >
-                Skip for now
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 5: Done */}
-        {step === 5 && (
-          <div className="text-center space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400">
-              <CheckCircle className="w-4 h-4" />
-              Agent Created
-            </div>
-            
-            <div>
-              <h2 className="text-2xl font-semibold mb-2">{config.name} is alive</h2>
-              <p className="text-white/50">
-                Your agent is ready. Fund it to start operations.
-              </p>
-            </div>
-
-            <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-left space-y-3 max-w-md mx-auto">
-              <div>
-                <div className="text-white/30 text-xs mb-1">Name</div>
-                <div className="font-medium">{config.name}</div>
-              </div>
-              <div>
-                <div className="text-white/30 text-xs mb-1">Genesis</div>
-                <div className="text-sm text-white/70 line-clamp-2">{config.genesisPrompt}</div>
-              </div>
-              <div className="pt-2 border-t border-white/10">
-                <div className="text-white/30 text-xs mb-1">Base / EVM Wallet</div>
-                <div className="font-mono text-xs text-white/50">{config.evmAddress}</div>
-              </div>
-              <div>
-                <div className="text-white/30 text-xs mb-1">Solana Wallet</div>
-                <div className="font-mono text-xs text-white/50">{config.solanaAddress}</div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 justify-center flex-wrap">
-              <a
-                href={`https://basescan.org/address/${config.evmAddress}`}
-                target="_blank"
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
-              >
-                Basescan <ExternalLink className="w-3 h-3" />
-              </a>
-              <a
-                href={`https://solscan.io/account/${config.solanaAddress}`}
-                target="_blank"
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
-              >
-                Solscan <ExternalLink className="w-3 h-3" />
-              </a>
-              <Link href="/credits" className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                <CreditCard className="w-3 h-3" /> Buy Credits
-              </Link>
-              <Link href="/agents" className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors">
                 View All Agents
               </Link>
             </div>
