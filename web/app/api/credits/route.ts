@@ -294,27 +294,60 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * Auto-detect chain from transaction hash format
+ */
+function detectChainFromTxHash(txHash: string): 'solana' | 'base' | 'unknown' {
+  // Base/Ethereum tx hashes start with 0x and are 66 chars
+  if (txHash.startsWith('0x') && txHash.length === 66) {
+    return 'base';
+  }
+  // Solana signatures are base58, typically 87-88 chars
+  if (txHash.length >= 80 && txHash.length <= 90 && !txHash.startsWith('0x')) {
+    return 'solana';
+  }
+  return 'unknown';
+}
+
+/**
  * POST /api/credits - Claim credits after deposit
  * 
- * Body: { action: 'claim', txHash, chain, asset, userBaseAddress }
+ * Body: { action: 'claim', txHash, chain?, asset?, userBaseAddress }
  */
 export async function POST(request: NextRequest) {
   try {
     initDepositsTable();
     
     const body = await request.json();
-    const { action, txHash, chain, asset, userBaseAddress } = body;
+    let { action, txHash, chain, asset, userBaseAddress } = body;
     
     if (action !== 'claim') {
       return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
     
-    // Validate inputs
-    if (!txHash || !chain || !asset || !userBaseAddress) {
+    // Validate txHash
+    if (!txHash) {
       return NextResponse.json({
         success: false,
-        error: 'Missing required fields: txHash, chain, asset, userBaseAddress',
+        error: 'Missing transaction hash',
       }, { status: 400 });
+    }
+    
+    txHash = txHash.trim();
+    
+    // Auto-detect chain if not provided
+    if (!chain) {
+      chain = detectChainFromTxHash(txHash);
+      if (chain === 'unknown') {
+        return NextResponse.json({
+          success: false,
+          error: 'Could not detect chain from transaction hash. Solana signatures are ~88 chars, Base tx hashes start with 0x and are 66 chars.',
+        }, { status: 400 });
+      }
+    }
+    
+    // Default asset based on chain
+    if (!asset) {
+      asset = 'usdc'; // Default to USDC
     }
     
     if (!['solana', 'base'].includes(chain)) {
@@ -349,24 +382,56 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Verify the deposit transaction
-    let depositAmount: number; // in USDC/credits
+    // Verify the deposit transaction - try detected chain first, then fallback
+    let depositAmount: number | undefined;
     let senderWallet: string | undefined;
+    let verifiedChain: string = chain;
+    let lastError: string = '';
     
     if (chain === 'solana') {
+      // Try Solana first
       const result = await verifySolanaDeposit(txHash, asset);
-      if (!result.success) {
-        return NextResponse.json({ success: false, error: result.error }, { status: 400 });
+      if (result.success) {
+        depositAmount = result.amount;
+        senderWallet = result.senderWallet;
+      } else {
+        lastError = result.error || 'Solana verification failed';
+        // Try Base as fallback
+        const baseResult = await verifyBaseDeposit(txHash);
+        if (baseResult.success) {
+          depositAmount = baseResult.amount;
+          senderWallet = baseResult.senderWallet;
+          verifiedChain = 'base';
+        } else {
+          lastError = `Solana: ${lastError}. Base: ${baseResult.error || 'verification failed'}`;
+        }
       }
-      depositAmount = result.amount!;
-      senderWallet = result.senderWallet;
     } else {
+      // Try Base first
       const result = await verifyBaseDeposit(txHash);
-      if (!result.success) {
-        return NextResponse.json({ success: false, error: result.error }, { status: 400 });
+      if (result.success) {
+        depositAmount = result.amount;
+        senderWallet = result.senderWallet;
+      } else {
+        lastError = result.error || 'Base verification failed';
+        // Try Solana as fallback
+        const solResult = await verifySolanaDeposit(txHash, 'usdc');
+        if (solResult.success) {
+          depositAmount = solResult.amount;
+          senderWallet = solResult.senderWallet;
+          verifiedChain = 'solana';
+        } else {
+          lastError = `Base: ${lastError}. Solana: ${solResult.error || 'verification failed'}`;
+        }
       }
-      depositAmount = result.amount!;
-      senderWallet = result.senderWallet;
+    }
+    
+    if (!depositAmount) {
+      return NextResponse.json({ 
+        success: false, 
+        error: `Failed to verify: ${lastError}`,
+        detectedChain: chain,
+      }, { status: 400 });
     }
     
     // Minimum deposit check
@@ -376,6 +441,7 @@ export async function POST(request: NextRequest) {
         error: `Deposit too small. Minimum $5 USDC equivalent. Received: $${depositAmount.toFixed(2)}`,
         senderWallet,
         amount: depositAmount,
+        chain: verifiedChain,
       }, { status: 400 });
     }
     
@@ -384,7 +450,7 @@ export async function POST(request: NextRequest) {
       db.prepare(`
         INSERT INTO credit_deposits (tx_hash, chain, asset, amount_raw, amount_credits, user_base_address, status)
         VALUES (?, ?, ?, ?, ?, ?, 'verified')
-      `).run(txHash, chain, asset, depositAmount.toString(), depositAmount, userBaseAddress);
+      `).run(txHash, verifiedChain, asset, depositAmount.toString(), depositAmount, userBaseAddress);
     }
     
     // Auto-purchase Conway credits with the deposit

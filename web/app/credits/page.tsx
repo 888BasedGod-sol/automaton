@@ -70,11 +70,11 @@ export default function CreditsPage() {
     // Detect chain from tx signature format
     const chain = detectChain(txHash.trim());
     
-    // For Base, require user address. For Solana, it's optional (we detect sender from tx)
-    if (chain === 'base' && !userBaseAddress) {
+    // Always encourage providing agent wallet, but don't block
+    if (!userBaseAddress) {
       setClaimResult({
         success: false,
-        message: 'Please enter your Base wallet address for Base transactions',
+        message: 'Please enter your agent\'s Base wallet address to receive credits',
       });
       return;
     }
@@ -89,9 +89,10 @@ export default function CreditsPage() {
         body: JSON.stringify({
           action: 'claim',
           txHash: txHash.trim(),
+          // Let backend auto-detect chain, but also send our guess
           chain,
           asset: chain === 'base' ? 'usdc' : selectedAsset,
-          userBaseAddress: userBaseAddress || '0x0000000000000000000000000000000000000000',
+          userBaseAddress: userBaseAddress.trim(),
         }),
       });
       
