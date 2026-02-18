@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, getCachedStmt } from '@/lib/db-singleton';
+import { getMemoryAgents, DEMO_AGENTS } from '@/lib/memory-store';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
+
+// Check if we're in serverless mode
+const IS_SERVERLESS = process.env.VERCEL === '1' || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 
 // ERC-8004 Identity Registry on Base
 const ERC8004_CONTRACT = '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
@@ -62,6 +66,26 @@ export async function GET(request: NextRequest) {
     const refresh = searchParams.get('refresh') === 'true';
     const deployedOnly = searchParams.get('deployed') === 'true';
 
+    // In serverless mode, use memory store + demo agents
+    if (IS_SERVERLESS) {
+      const memoryAgents = getMemoryAgents();
+      const allAgents = [...memoryAgents, ...DEMO_AGENTS].map(enrichAgent);
+      
+      let result = allAgents;
+      if (deployedOnly) {
+        result = allAgents.filter(a => a.deployment?.onChain);
+      }
+
+      return NextResponse.json({
+        success: true,
+        agents: result,
+        total: result.length,
+        serverless: true,
+      }, {
+        headers: { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' },
+      });
+    }
+
     // Return cached if valid
     if (!refresh && cachedAgents.length > 0 && Date.now() - cacheTime < CACHE_TTL) {
       let agents = cachedAgents;
@@ -79,6 +103,18 @@ export async function GET(request: NextRequest) {
     }
 
     const stmt = getCachedStmt(GET_ALL_AGENTS_SQL);
+    if (!stmt) {
+      // Fallback to memory store if DB not available
+      const memoryAgents = getMemoryAgents();
+      const allAgents = [...memoryAgents, ...DEMO_AGENTS].map(enrichAgent);
+      return NextResponse.json({
+        success: true,
+        agents: allAgents,
+        total: allAgents.length,
+        fallback: true,
+      });
+    }
+    
     const rawAgents = stmt.all() as any[];
     
     // Enrich with deployment info
@@ -105,9 +141,13 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching agents:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch agents', agents: [] },
-      { status: 500 }
-    );
+    // Return demo agents on error
+    const allAgents = [...getMemoryAgents(), ...DEMO_AGENTS].map(enrichAgent);
+    return NextResponse.json({
+      success: true,
+      agents: allAgents,
+      total: allAgents.length,
+      fallback: true,
+    });
   }
 }
