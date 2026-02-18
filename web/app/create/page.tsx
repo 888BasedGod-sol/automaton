@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle, Copy, ExternalLink, ArrowRight, ArrowLeft, Loader2, Zap } from 'lucide-react';
+import { CheckCircle, Copy, ExternalLink, ArrowRight, ArrowLeft, Loader2, Zap, CreditCard, Coins } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Create() {
@@ -88,7 +88,7 @@ export default function Create() {
       <main className="relative max-w-2xl mx-auto px-6 py-12">
         {/* Progress */}
         <div className="flex items-center justify-center gap-2 mb-16">
-          {['Configure', 'Generate', 'Save', 'Done'].map((label, i) => (
+          {['Configure', 'Generate', 'Save', 'Fund', 'Done'].map((label, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border transition-colors ${
                 step > i + 1 ? 'bg-white text-black border-white' :
@@ -97,7 +97,7 @@ export default function Create() {
               }`}>
                 {step > i + 1 ? <CheckCircle className="w-4 h-4" /> : i + 1}
               </div>
-              {i < 3 && <div className={`w-8 h-px ${step > i + 1 ? 'bg-white' : 'bg-white/20'}`} />}
+              {i < 4 && <div className={`w-8 h-px ${step > i + 1 ? 'bg-white' : 'bg-white/20'}`} />}
             </div>
           ))}
         </div>
@@ -245,8 +245,70 @@ export default function Create() {
           </div>
         )}
 
-        {/* Step 4: Done */}
+        {/* Step 4: Fund */}
         {step === 4 && (
+          <div className="space-y-6">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-semibold mb-2">Fund Your Agent</h2>
+              <p className="text-white/50">Purchase credits to power your agent&apos;s operations</p>
+            </div>
+            
+            {/* Credit Options */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { value: 5, label: '$5', description: 'Good for testing' },
+                { value: 10, label: '$10', description: 'Light usage' },
+                { value: 25, label: '$25', description: 'Recommended', recommended: true },
+                { value: 50, label: '$50', description: 'Power user' },
+              ].map((amount) => (
+                <div
+                  key={amount.value}
+                  className={`p-4 rounded-lg border text-left transition-all ${
+                    amount.recommended 
+                      ? 'border-purple-500/50 bg-purple-500/10' 
+                      : 'border-white/10 bg-white/5'
+                  }`}
+                >
+                  <div className="text-lg font-semibold">{amount.label}</div>
+                  <div className="text-xs text-white/50">{amount.description}</div>
+                  {amount.recommended && <div className="text-xs text-purple-400 mt-1">★ Popular</div>}
+                </div>
+              ))}
+            </div>
+
+            {/* Agent Summary */}
+            <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+              <div className="flex items-center gap-3 mb-3">
+                <Coins className="w-5 h-5 text-yellow-400" />
+                <span className="font-medium">Agent: {config.name}</span>
+              </div>
+              <div className="text-xs text-white/40 space-y-1">
+                <div>Base: <span className="font-mono">{config.evmAddress.slice(0, 10)}...{config.evmAddress.slice(-8)}</span></div>
+                <div>Solana: <span className="font-mono">{config.solanaAddress.slice(0, 8)}...{config.solanaAddress.slice(-8)}</span></div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Link
+                href="/credits"
+                className="w-full py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
+              >
+                <CreditCard className="w-4 h-4" />
+                Buy Credits
+              </Link>
+              
+              <button
+                onClick={() => setStep(5)}
+                className="w-full py-2 text-white/40 hover:text-white/60 text-sm transition-colors"
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Done */}
+        {step === 5 && (
           <div className="text-center space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400">
               <CheckCircle className="w-4 h-4" />
@@ -256,7 +318,7 @@ export default function Create() {
             <div>
               <h2 className="text-2xl font-semibold mb-2">{config.name} is alive</h2>
               <p className="text-white/50">
-                Fund your agent&apos;s wallets to activate it
+                Your agent is ready. Fund it to start operations.
               </p>
             </div>
 
@@ -279,7 +341,7 @@ export default function Create() {
               </div>
             </div>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center flex-wrap">
               <a
                 href={`https://basescan.org/address/${config.evmAddress}`}
                 target="_blank"
@@ -294,6 +356,9 @@ export default function Create() {
               >
                 Solscan <ExternalLink className="w-3 h-3" />
               </a>
+              <Link href="/credits" className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                <CreditCard className="w-3 h-3" /> Buy Credits
+              </Link>
               <Link href="/agents" className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors">
                 View All Agents
               </Link>
