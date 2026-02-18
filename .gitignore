@@ -9,8 +9,9 @@ dist/
 .env.production
 .DS_Store
 *.tgz
-.automaton/wallet.json
-.automaton/state.db
+# Automaton config (contains private keys)
+.automaton/
+~/.automaton/
 
 # Sensitive data - NEVER commit
 data/
@@ -20,6 +21,7 @@ data/*.json
 **/wallet.json
 **/solana-wallet.json
 **/identity.json
+**/treasury.json
 
 # Build outputs
 .next/

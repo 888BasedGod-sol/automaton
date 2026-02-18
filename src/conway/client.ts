@@ -18,6 +18,7 @@ import type {
   DomainRegistration,
   DnsRecord,
   ModelInfo,
+  NetworkAgent,
 } from "../types.js";
 
 interface ConwayClientOptions {
@@ -373,6 +374,49 @@ export function createConwayClient(
     return [];
   };
 
+  /**
+   * List all public agents on the Conway network.
+   * This queries Conway's agent directory.
+   */
+  const listNetworkAgents = async (options?: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+  }): Promise<NetworkAgent[]> => {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.offset) params.set("offset", String(options.offset));
+    if (options?.status) params.set("status", options.status);
+    
+    const queryString = params.toString();
+    const path = `/v1/agents${queryString ? `?${queryString}` : ""}`;
+    
+    try {
+      const result = await request("GET", path);
+      const agents = result.agents || result.data || [];
+      return agents.map((a: any) => ({
+        id: a.id || a.agent_id,
+        name: a.name || "Unknown",
+        description: a.description || a.genesis_prompt || "",
+        status: a.status || "unknown",
+        sandboxId: a.sandbox_id || a.sandboxId,
+        evmAddress: a.evm_address || a.evmAddress,
+        solanaAddress: a.solana_address || a.solanaAddress,
+        creditsBalance: a.credits_balance ?? a.creditsBalance ?? 0,
+        region: a.region || "",
+        createdAt: a.created_at || a.createdAt || "",
+        lastActiveAt: a.last_active_at || a.lastActiveAt || "",
+        publicUrl: a.public_url || a.publicUrl,
+      }));
+    } catch (error: any) {
+      // If endpoint doesn't exist, return empty array
+      if (error.message?.includes("404") || error.message?.includes("not found")) {
+        return [];
+      }
+      throw error;
+    }
+  };
+
   const client = {
     exec,
     writeFile,
@@ -386,6 +430,7 @@ export function createConwayClient(
     getCreditsPricing,
     transferCredits,
     depositSolana,
+    listNetworkAgents,
     searchDomains,
     registerDomain,
     listDnsRecords,

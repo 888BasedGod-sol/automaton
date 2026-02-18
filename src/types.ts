@@ -377,6 +377,12 @@ export interface ConwayClient {
     txSignature: string,
     network?: string,
   ): Promise<{ success: boolean; creditsAdded?: number; error?: string }>;
+  // Network agents
+  listNetworkAgents(options?: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+  }): Promise<NetworkAgent[]>;
   // Domain operations
   searchDomains(query: string, tlds?: string): Promise<DomainSearchResult[]>;
   registerDomain(domain: string, years?: number): Promise<DomainRegistration>;
@@ -422,6 +428,21 @@ export interface SandboxInfo {
   diskGb: number;
   terminalUrl?: string;
   createdAt: string;
+}
+
+export interface NetworkAgent {
+  id: string;
+  name: string;
+  description: string;
+  status: string;
+  sandboxId?: string;
+  evmAddress?: string;
+  solanaAddress?: string;
+  creditsBalance: number;
+  region: string;
+  createdAt: string;
+  lastActiveAt: string;
+  publicUrl?: string;
 }
 
 export interface PricingTier {

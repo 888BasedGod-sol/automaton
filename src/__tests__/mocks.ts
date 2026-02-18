@@ -19,6 +19,7 @@ import type {
   DomainRegistration,
   DnsRecord,
   ModelInfo,
+  NetworkAgent,
   AutomatonDatabase,
   AutomatonIdentity,
   AutomatonConfig,
@@ -186,6 +187,14 @@ export class MockConwayClient implements ConwayClient {
 
   async searchDomains(_query: string, _tlds?: string): Promise<DomainSearchResult[]> {
     return [{ domain: "test.com", available: true, registrationPrice: 1200, currency: "USD" }];
+  }
+
+  async listNetworkAgents(_options?: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+  }): Promise<NetworkAgent[]> {
+    return [];
   }
 
   async registerDomain(domain: string, _years?: number): Promise<DomainRegistration> {
