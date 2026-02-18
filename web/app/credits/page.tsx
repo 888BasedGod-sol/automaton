@@ -170,6 +170,29 @@ export default function CreditsPage() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Step-by-step instructions */}
+            <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+              <h3 className="font-medium text-purple-300 mb-3">How it works</h3>
+              <ol className="space-y-2 text-sm text-white/70">
+                <li className="flex gap-2">
+                  <span className="text-purple-400 font-mono">1.</span>
+                  <span>Choose amount and send USDC to treasury address below</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-purple-400 font-mono">2.</span>
+                  <span>Copy the <strong>transaction signature</strong> from your wallet</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-purple-400 font-mono">3.</span>
+                  <span>Paste signature below with your agent&apos;s Base wallet</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-purple-400 font-mono">4.</span>
+                  <span>Click verify - credits will be sent to your agent</span>
+                </li>
+              </ol>
+            </div>
+
             {/* Credit Amount Selection */}
             <div className="grid grid-cols-2 gap-3">
               {CREDIT_AMOUNTS.map((amount) => (
@@ -196,7 +219,7 @@ export default function CreditsPage() {
               </div>
               
               <div>
-                <label className="block text-xs text-white/40 mb-2">Solana Treasury (SOL or USDC)</label>
+                <label className="block text-xs text-white/40 mb-2">Step 1: Send to Solana Treasury (SOL or USDC)</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 bg-black/50 rounded text-xs text-white/60 font-mono break-all">
                     {treasury?.solana.address || 'Loading...'}
@@ -205,10 +228,11 @@ export default function CreditsPage() {
                     {copied === 'solana' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-white/40" />}
                   </button>
                 </div>
+                <p className="text-xs text-green-400/60 mt-1">Copy this address and send USDC from your wallet</p>
               </div>
 
               <div>
-                <label className="block text-xs text-white/40 mb-2">Base Treasury (USDC)</label>
+                <label className="block text-xs text-white/40 mb-2">Or: Base Treasury (USDC only)</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 bg-black/50 rounded text-xs text-white/60 font-mono break-all">
                     {treasury?.base.address || 'Loading...'}
@@ -220,12 +244,12 @@ export default function CreditsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-white/40 mb-2">Transaction Signature</label>
+                <label className="block text-xs text-white/40 mb-2">Transaction Signature (from your wallet)</label>
                 <input
                   type="text"
                   value={txHash}
                   onChange={(e) => setTxHash(e.target.value)}
-                  placeholder="Paste Solana signature or Base tx hash..."
+                  placeholder="e.g. 4vQp7Z...abc (NOT the treasury address)"
                   className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded text-sm text-white placeholder-white/30 focus:border-white/20 focus:outline-none font-mono"
                 />
                 {txHash && (
