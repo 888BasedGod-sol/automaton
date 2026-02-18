@@ -5,7 +5,24 @@ dist/
 *.db-wal
 *.db-shm
 .env
+.env.local
+.env.production
 .DS_Store
 *.tgz
 .automaton/wallet.json
 .automaton/state.db
+
+# Sensitive data - NEVER commit
+data/
+data/*.json
+*.pem
+*.key
+**/wallet.json
+**/solana-wallet.json
+**/identity.json
+
+# Build outputs
+.next/
+out/
+build/
+*.log
