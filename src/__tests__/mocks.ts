@@ -175,6 +175,15 @@ export class MockConwayClient implements ConwayClient {
     };
   }
 
+  async depositSolana(
+    txSignature: string,
+    network?: string,
+  ): Promise<{ success: boolean; creditsAdded?: number; error?: string }> {
+    const credits = 1000; // Mock: $10 worth
+    this.creditsCents += credits;
+    return { success: true, creditsAdded: credits };
+  }
+
   async searchDomains(_query: string, _tlds?: string): Promise<DomainSearchResult[]> {
     return [{ domain: "test.com", available: true, registrationPrice: 1200, currency: "USD" }];
   }

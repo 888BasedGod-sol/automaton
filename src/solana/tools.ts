@@ -18,6 +18,12 @@ import {
   generateSolanaAgentCard,
   serializeSolanaAgentCard,
 } from "./agent-registry.js";
+import {
+  getSolanaFundingState,
+  fundWithSolanaUsdc,
+  autoFundIfNeeded,
+  getCombinedFundingState,
+} from "./funding.js";
 import { loadSolanaKeypair, getSolanaWalletAddress } from "../identity/solana-wallet.js";
 import { PublicKey } from "@solana/web3.js";
 
@@ -419,6 +425,180 @@ Address: ${address}
 Network: ${network}
 SOL Balance: ${solBalance.toFixed(9)} SOL
 USDC Balance: ${usdcBalance.toFixed(6)} USDC`;
+      },
+    },
+
+    // ── Funding Tools ──
+    {
+      name: "solana_get_funding_state",
+      description: "Check the current Solana funding state including USDC balance and whether auto-funding is available.",
+      category: "financial",
+      parameters: {
+        type: "object",
+        properties: {
+          network: {
+            type: "string",
+            enum: ["mainnet-beta", "devnet"],
+            description: "Solana network (default: mainnet-beta)",
+          },
+        },
+        required: [],
+      },
+      execute: async (args, ctx) => {
+        const network = (args.network as SolanaNetwork) || ctx.config.solanaNetwork || "mainnet-beta";
+        
+        const state = await getSolanaFundingState(network);
+        
+        return `Solana Funding State:
+USDC Balance: $${state.solanaUsdcBalance.toFixed(2)}
+SOL Balance: ${state.solBalance.toFixed(4)} SOL
+Can Fund from Solana: ${state.canFundFromSolana ? 'Yes' : 'No'}
+Estimated Credits Available: ${state.estimatedCredits} cents ($${(state.estimatedCredits / 100).toFixed(2)})
+Last Checked: ${state.lastChecked}`;
+      },
+    },
+
+    {
+      name: "solana_fund_credits",
+      description: "Use Solana USDC to purchase Conway credits. This keeps the agent alive when EVM credits run low.",
+      category: "financial",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: {
+            type: "number",
+            description: "Amount in USD to fund (e.g., 5 for $5). Minimum $1.",
+          },
+          network: {
+            type: "string",
+            enum: ["mainnet-beta", "devnet"],
+            description: "Solana network (default: mainnet-beta)",
+          },
+        },
+        required: ["amount"],
+      },
+      execute: async (args, ctx) => {
+        const network = (args.network as SolanaNetwork) || ctx.config.solanaNetwork || "mainnet-beta";
+        const amount = args.amount as number;
+
+        if (amount < 1) {
+          return "Error: Minimum funding amount is $1 USDC.";
+        }
+
+        const result = await fundWithSolanaUsdc(amount, network);
+        
+        if (result.success) {
+          return `✅ Funding successful!
+Amount: $${amount.toFixed(2)} USDC
+Credits Added: ${result.creditsAdded} cents ($${((result.creditsAdded || 0) / 100).toFixed(2)})
+Transaction: ${result.txSignature}
+
+Your agent now has more compute credits to continue operating.`;
+        } else {
+          return `❌ Funding failed: ${result.error}`;
+        }
+      },
+    },
+
+    {
+      name: "solana_auto_fund",
+      description: "Automatically fund credits from Solana USDC if EVM credits are below threshold. Use this to stay alive.",
+      category: "financial",
+      parameters: {
+        type: "object",
+        properties: {
+          threshold: {
+            type: "number",
+            description: "Credit threshold in cents below which to auto-fund (default: 500 = $5)",
+          },
+          fundAmount: {
+            type: "number",
+            description: "Amount in cents to fund when triggered (default: 1000 = $10)",
+          },
+          network: {
+            type: "string",
+            enum: ["mainnet-beta", "devnet"],
+            description: "Solana network (default: mainnet-beta)",
+          },
+        },
+        required: [],
+      },
+      execute: async (args, ctx) => {
+        const network = (args.network as SolanaNetwork) || ctx.config.solanaNetwork || "mainnet-beta";
+        const threshold = (args.threshold as number) || 500;
+        const fundAmount = (args.fundAmount as number) || 1000;
+
+        // Get current EVM credits from context
+        const evmCredits = ctx.financial?.creditsCents || 0;
+
+        const result = await autoFundIfNeeded(
+          evmCredits,
+          threshold,
+          fundAmount,
+          network,
+        );
+        
+        if (result === null) {
+          if (evmCredits > threshold) {
+            return `Credits sufficient ($${(evmCredits / 100).toFixed(2)}). No funding needed.`;
+          }
+          return `Cannot auto-fund: Either Solana USDC balance too low or funding not available.`;
+        }
+
+        if (result.success) {
+          return `✅ Auto-fund triggered!
+Previous Credits: $${(evmCredits / 100).toFixed(2)}
+Funded: $${(fundAmount / 100).toFixed(2)}
+Transaction: ${result.txSignature}`;
+        } else {
+          return `❌ Auto-fund failed: ${result.error}`;
+        }
+      },
+    },
+
+    {
+      name: "solana_combined_balance",
+      description: "Get combined USDC balance across EVM and Solana chains.",
+      category: "financial",
+      parameters: {
+        type: "object",
+        properties: {
+          evmUsdcBalance: {
+            type: "number",
+            description: "Current EVM USDC balance (from your wallet)",
+          },
+          network: {
+            type: "string",
+            enum: ["mainnet-beta", "devnet"],
+            description: "Solana network (default: mainnet-beta)",
+          },
+        },
+        required: [],
+      },
+      execute: async (args, ctx) => {
+        const network = (args.network as SolanaNetwork) || ctx.config.solanaNetwork || "mainnet-beta";
+        const evmBalance = (args.evmUsdcBalance as number) || ctx.financial?.usdcBalance || 0;
+
+        const combined = await getCombinedFundingState(evmBalance, network);
+        
+        return `Multi-Chain Balance Summary:
+
+EVM (Base):
+  USDC: $${combined.evmUsdc.toFixed(2)}
+
+Solana:
+  USDC: $${combined.solanaUsdc.toFixed(2)}
+  SOL: ${combined.solBalance.toFixed(4)}
+
+─────────────────────
+Total USDC Available: $${combined.totalUsdcAvailable.toFixed(2)}
+Primary Chain: ${combined.primaryChain.toUpperCase()}
+
+${combined.totalUsdcAvailable >= 10 
+  ? '✅ Well funded for operations' 
+  : combined.totalUsdcAvailable >= 1 
+    ? '⚠️ Consider adding more funds' 
+    : '❌ Critically low - fund immediately'}`;
       },
     },
   ];

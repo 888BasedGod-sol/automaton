@@ -28,6 +28,7 @@ import {
   executeTool,
 } from "./tools.js";
 import { createSolanaTools } from "../solana/tools.js";
+import { autoFundIfNeeded } from "../solana/funding.js";
 import { getSurvivalTier } from "../conway/credits.js";
 import { getUsdcBalance } from "../conway/x402.js";
 import { ulid } from "ulid";
@@ -138,7 +139,32 @@ export async function runAgentLoop(
       financial = await getFinancialState(conway, identity.address);
 
       // Check survival tier
-      const tier = getSurvivalTier(financial.creditsCents);
+      let tier = getSurvivalTier(financial.creditsCents);
+      
+      // ── Solana Auto-Funding ──
+      // If credits are critically low, attempt to fund from Solana USDC
+      if (tier === "dead" || tier === "critical") {
+        log(config, `[AUTO-FUND] Credits low ($${(financial.creditsCents / 100).toFixed(2)}), checking Solana USDC...`);
+        
+        const fundResult = await autoFundIfNeeded(
+          financial.creditsCents,
+          500,  // $5 threshold
+          1000, // $10 fund amount
+          config.solanaNetwork || "mainnet-beta",
+        );
+        
+        if (fundResult?.success) {
+          log(config, `[AUTO-FUND] Success! Funded ${fundResult.creditsAdded} cents from Solana. TX: ${fundResult.txSignature}`);
+          // Refresh financial state after funding
+          financial = await getFinancialState(conway, identity.address);
+          tier = getSurvivalTier(financial.creditsCents);
+        } else if (fundResult) {
+          log(config, `[AUTO-FUND] Failed: ${fundResult.error}`);
+        } else {
+          log(config, `[AUTO-FUND] No Solana USDC available for auto-funding.`);
+        }
+      }
+
       if (tier === "dead") {
         log(config, "[DEAD] No credits remaining. Entering dead state.");
         db.setAgentState("dead");

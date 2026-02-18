@@ -232,6 +232,38 @@ export function createConwayClient(
     );
   };
 
+  /**
+   * Deposit credits via Solana USDC transfer.
+   * After sending USDC to Conway's Solana treasury, call this to claim credits.
+   */
+  const depositSolana = async (
+    txSignature: string,
+    network: string = "mainnet-beta",
+  ): Promise<{ success: boolean; creditsAdded?: number; error?: string }> => {
+    try {
+      const result = await request("POST", "/v1/credits/deposit-solana", {
+        txSignature,
+        network,
+      });
+      return {
+        success: true,
+        creditsAdded: result.credits_added ?? result.amount_cents ?? 0,
+      };
+    } catch (error: any) {
+      // If endpoint doesn't exist yet, return graceful error
+      if (error.message?.includes("404")) {
+        return {
+          success: false,
+          error: "Solana deposits not yet supported by Conway API. Contact support to enable.",
+        };
+      }
+      return {
+        success: false,
+        error: error.message || "Failed to claim Solana deposit",
+      };
+    }
+  };
+
   // ─── Domains ──────────────────────────────────────────────────
 
   const searchDomains = async (
@@ -353,6 +385,7 @@ export function createConwayClient(
     getCreditsBalance,
     getCreditsPricing,
     transferCredits,
+    depositSolana,
     searchDomains,
     registerDomain,
     listDnsRecords,

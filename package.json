@@ -40,7 +40,8 @@
     "build": "tsc && pnpm -r build",
     "dev": "tsx watch src/index.ts",
     "test": "vitest run",
-    "clean": "rm -rf dist && pnpm -r clean"
+    "clean": "rm -rf dist && pnpm -r clean",
+    "deposit-solana": "npx tsx scripts/deposit-from-solana.ts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.14",

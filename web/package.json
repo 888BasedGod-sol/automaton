@@ -1,0 +1,45 @@
+{
+  "name": "@conway/automaton-dashboard",
+  "version": "0.1.0",
+  "description": "Automaton Dashboard - Sovereign AI Agent Control Panel",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "funding-monitor": "npx tsx scripts/funding-monitor.ts"
+  },
+  "keywords": [
+    "automaton",
+    "ai",
+    "dashboard",
+    "solana",
+    "ethereum"
+  ],
+  "author": "Automaton <automaton@conway.tech>",
+  "license": "MIT",
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^25.2.3",
+    "@types/react": "^19.2.14",
+    "autoprefixer": "^10.4.24",
+    "better-sqlite3": "^12.6.2",
+    "bs58": "^6.0.0",
+    "ethers": "^6.16.0",
+    "lucide-react": "^0.574.0",
+    "next": "^14.2.35",
+    "postcss": "^8.5.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.21.0"
+  }
+}

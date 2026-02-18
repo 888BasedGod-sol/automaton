@@ -181,6 +181,7 @@ export interface ToolContext {
   conway: ConwayClient;
   inference: InferenceClient;
   social?: SocialClientInterface;
+  financial?: FinancialState;
 }
 
 export interface SocialClientInterface {
@@ -371,6 +372,11 @@ export interface ConwayClient {
     amountCents: number,
     note?: string,
   ): Promise<CreditTransferResult>;
+  // Solana deposits
+  depositSolana(
+    txSignature: string,
+    network?: string,
+  ): Promise<{ success: boolean; creditsAdded?: number; error?: string }>;
   // Domain operations
   searchDomains(query: string, tlds?: string): Promise<DomainSearchResult[]>;
   registerDomain(domain: string, years?: number): Promise<DomainRegistration>;
