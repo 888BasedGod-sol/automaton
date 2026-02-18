@@ -27,6 +27,7 @@ import {
   toolsToInferenceFormat,
   executeTool,
 } from "./tools.js";
+import { createSolanaTools } from "../solana/tools.js";
 import { getSurvivalTier } from "../conway/credits.js";
 import { getUsdcBalance } from "../conway/x402.js";
 import { ulid } from "ulid";
@@ -56,7 +57,11 @@ export async function runAgentLoop(
   const { identity, config, db, conway, inference, social, skills, onStateChange, onTurnComplete } =
     options;
 
-  const tools = createBuiltinTools(identity.sandboxId);
+  // Combine builtin tools with Solana tools
+  const builtinTools = createBuiltinTools(identity.sandboxId);
+  const solanaTools = createSolanaTools();
+  const tools = [...builtinTools, ...solanaTools];
+  
   const toolContext: ToolContext = {
     identity,
     config,

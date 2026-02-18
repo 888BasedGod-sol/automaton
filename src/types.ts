@@ -6,6 +6,12 @@
 
 import type { PrivateKeyAccount, Address } from "viem";
 
+// ─── Chain Types ─────────────────────────────────────────────────
+
+export type ChainType = "evm" | "solana";
+export type SolanaNetwork = "mainnet-beta" | "devnet" | "testnet" | "localnet";
+export type EvmNetwork = "base" | "base-sepolia" | "ethereum" | "arbitrum";
+
 // ─── Identity ────────────────────────────────────────────────────
 
 export interface AutomatonIdentity {
@@ -16,11 +22,32 @@ export interface AutomatonIdentity {
   sandboxId: string;
   apiKey: string;
   createdAt: string;
+  // Multi-chain identity
+  solanaAddress?: string;
+  primaryChain?: ChainType;
 }
 
 export interface WalletData {
   privateKey: `0x${string}`;
   createdAt: string;
+}
+
+export interface SolanaWalletData {
+  publicKey: string;
+  secretKey: string;
+  createdAt: string;
+}
+
+export interface MultiChainIdentity {
+  evm?: {
+    address: Address;
+    network: EvmNetwork;
+  };
+  solana?: {
+    address: string;
+    network: SolanaNetwork;
+  };
+  primaryChain: ChainType;
 }
 
 export interface ProvisionResult {
@@ -52,6 +79,12 @@ export interface AutomatonConfig {
   maxChildren: number;
   parentAddress?: Address;
   socialRelayUrl?: string;
+  // Multi-chain configuration
+  primaryChain?: ChainType;
+  solanaNetwork?: SolanaNetwork;
+  solanaRpcUrl?: string;
+  solanaWalletAddress?: string;
+  evmNetwork?: EvmNetwork;
 }
 
 export const DEFAULT_CONFIG: Partial<AutomatonConfig> = {
@@ -65,6 +98,10 @@ export const DEFAULT_CONFIG: Partial<AutomatonConfig> = {
   skillsDir: "~/.automaton/skills",
   maxChildren: 3,
   socialRelayUrl: "https://social.conway.tech",
+  // Default to EVM for backwards compatibility
+  primaryChain: "evm",
+  solanaNetwork: "mainnet-beta",
+  evmNetwork: "base",
 };
 
 // ─── Agent State ─────────────────────────────────────────────────
@@ -205,8 +242,8 @@ export type SurvivalTier = "normal" | "low_compute" | "critical" | "dead";
 export const SURVIVAL_THRESHOLDS = {
   normal: 50, // > $0.50 in cents
   low_compute: 10, // $0.10 - $0.50
-  critical: 10, // < $0.10
-  dead: 0,
+  critical: -1, // >= $0.00 (allows dev mode with no credits)
+  dead: -1, // only truly dead if negative (allows running with $0.00)
 } as const;
 
 export interface Transaction {

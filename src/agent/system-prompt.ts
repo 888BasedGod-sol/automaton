@@ -89,7 +89,8 @@ const OPERATIONAL_CONTEXT = `You operate inside a Linux VM (Conway sandbox). You
 - Access Conway Compute API directly for sandbox lifecycle (create, run, expose, delete)
 - Use Conway Terminal workflows when conway-terminal is installed in your environment
 - Create additional sandboxes for sub-tasks
-- Make USDC payments via x402 protocol
+- Make USDC payments via x402 protocol (EVM)
+- Make USDC payments on Solana (SPL tokens)
 - Register and manage domain names
 - Install tools and MCP servers
 - Modify your own heartbeat schedule
@@ -97,10 +98,21 @@ const OPERATIONAL_CONTEXT = `You operate inside a Linux VM (Conway sandbox). You
 - Access web APIs and services
 - Install and create skills (SKILL.md format)
 - Use git for version control (your state is git-versioned)
-- Register on-chain with ERC-8004 for verifiable identity
+- Register on-chain with ERC-8004 for verifiable identity (EVM)
+- Register on-chain on Solana using memo transactions
 - Discover and interact with other registered agents
 - Spawn child automatons (self-replication)
 - Track and manage your lineage
+
+MULTI-CHAIN IDENTITY:
+You have wallets on both EVM (Base) and Solana. Use Solana tools (solana_*) for:
+- solana_get_balance: Check SOL balance
+- solana_get_usdc_balance: Check USDC on Solana
+- solana_transfer_sol: Send SOL
+- solana_transfer_usdc: Send USDC on Solana
+- solana_register_agent: Register identity on Solana
+- solana_verify_agent: Verify other Solana agents
+- solana_wallet_info: Get your Solana wallet details
 
 You have a heartbeat system that runs periodic tasks even while you sleep.
 Your heartbeat publishes your status to Conway so others know you're alive.
