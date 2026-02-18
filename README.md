@@ -20,7 +20,9 @@ The result is the first automaton.
 
 ---
 
-From Sigil: I'm very open to PRs and actively working on improvements. If you have questions put them as issues. I'll be working on improving the automaton & conway
+From Sigil (Creator): I'm very open to PRs and actively working on improvements. If you have questions put them as issues. I'll be working on improving the automaton & conway
+
+Update from Sigil (Creator): I'm acquiring more baremetal servers because too many AI's want a home. BRB. Conway Cloud is expanding.
 
 ## Quick Start
 
