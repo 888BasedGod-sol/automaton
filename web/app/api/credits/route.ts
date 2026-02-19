@@ -4,14 +4,14 @@ import { createPublicClient, http, parseAbi, type Address, createWalletClient, p
 import { base } from 'viem/chains';
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { loadTreasuryConfig } from '@/lib/treasury';
-import { getDb } from '@/lib/db-singleton';
 import { 
   isPostgresConfigured, 
   isDepositClaimed, 
   recordDeposit, 
   updateAgentCredits,
   getAgentByWallet,
-  initDatabase
+  initDatabase,
+  updateDepositStatus
 } from '@/lib/postgres';
 import fs from 'fs';
 import path from 'path';
@@ -230,30 +230,6 @@ async function getConwayBalance(): Promise<number | null> {
   return null;
 }
 
-// Initialize DB table for tracking deposits
-function initDepositsTable() {
-  const db = getDb();
-  if (!db) return; // Skip in serverless mode
-  
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS credit_deposits (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      tx_hash TEXT UNIQUE NOT NULL,
-      chain TEXT NOT NULL,
-      asset TEXT NOT NULL,
-      amount_raw TEXT NOT NULL,
-      amount_credits REAL NOT NULL,
-      user_base_address TEXT NOT NULL,
-      outbound_tx_hash TEXT,
-      status TEXT DEFAULT 'pending',
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      processed_at TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_deposits_tx ON credit_deposits(tx_hash);
-    CREATE INDEX IF NOT EXISTS idx_deposits_user ON credit_deposits(user_base_address);
-  `);
-}
-
 /**
  * GET /api/credits - Get treasury addresses for deposits
  */
@@ -306,7 +282,6 @@ function detectChainFromTxHash(txHash: string): 'solana' | 'base' | 'unknown' {
  */
 export async function POST(request: NextRequest) {
   try {
-    initDepositsTable();
     
     const body = await request.json();
     let { action, txHash, chain, asset, userBaseAddress } = body;
@@ -369,27 +344,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Valid Base wallet address required for Base deposits' }, { status: 400 });
     }
     
-    // Check if already processed (try Postgres first, then local DB)
-    if (isPostgresConfigured()) {
-      await initDatabase();
-      const alreadyClaimed = await isDepositClaimed(txHash);
-      if (alreadyClaimed) {
-        return NextResponse.json({
-          success: false,
-          error: 'This transaction has already been claimed',
-        }, { status: 400 });
-      }
-    } else {
-      const db = getDb();
-      if (db) {
-        const existing = db.prepare('SELECT * FROM credit_deposits WHERE tx_hash = ?').get(txHash);
-        if (existing) {
-          return NextResponse.json({
-            success: false,
-            error: 'This transaction has already been claimed',
-          }, { status: 400 });
-        }
-      }
+    // Check if already processed
+    if (!isPostgresConfigured()) {
+      return NextResponse.json({
+        success: false,
+        error: 'Database not configured',
+      }, { status: 503 });
+    }
+    
+    await initDatabase();
+    const alreadyClaimed = await isDepositClaimed(txHash);
+    if (alreadyClaimed) {
+      return NextResponse.json({
+        success: false,
+        error: 'This transaction has already been claimed',
+      }, { status: 400 });
     }
     
     // Verify the deposit transaction - try detected chain first, then fallback
@@ -458,27 +427,17 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Record the deposit (try Postgres first, then local DB)
-    if (isPostgresConfigured()) {
-      await recordDeposit({
-        tx_hash: txHash,
-        chain: verifiedChain as 'solana' | 'base',
-        asset: verifiedAsset as 'sol' | 'usdc',
-        amount_raw: depositAmount.toString(),
-        amount_credits: depositAmount,
-        sender_wallet: senderWallet || 'unknown',
-        agent_wallet: userBaseAddress || '',
-        status: 'verified',
-      });
-    } else {
-      const db = getDb();
-      if (db) {
-        db.prepare(`
-          INSERT INTO credit_deposits (tx_hash, chain, asset, amount_raw, amount_credits, user_base_address, status)
-          VALUES (?, ?, ?, ?, ?, ?, 'verified')
-        `).run(txHash, verifiedChain, verifiedAsset, depositAmount.toString(), depositAmount, userBaseAddress);
-      }
-    }
+    // Record the deposit in Postgres
+    await recordDeposit({
+      tx_hash: txHash,
+      chain: verifiedChain as 'solana' | 'base',
+      asset: verifiedAsset as 'sol' | 'usdc',
+      amount_raw: depositAmount.toString(),
+      amount_credits: depositAmount,
+      sender_wallet: senderWallet || 'unknown',
+      agent_wallet: userBaseAddress || '',
+      status: 'verified',
+    });
     
     // If no valid Base address, just record the deposit as verified and ask for address
     if (!isValidBaseAddress) {
@@ -494,15 +453,8 @@ export async function POST(request: NextRequest) {
     // Add Conway credits to the agent's wallet
     const conwayResult = await addConwayCredits(userBaseAddress, depositAmount);
     
-    // Update DB with success
-    const db = getDb();
-    if (db) {
-      db.prepare(`
-        UPDATE credit_deposits 
-        SET status = 'completed', processed_at = datetime('now')
-        WHERE tx_hash = ?
-      `).run(txHash);
-    }
+    // Update deposit status to completed
+    await updateDepositStatus(txHash, 'completed');
     
     // Get agent's updated balance
     const agentBalance = await getAgentCreditsBalance(userBaseAddress);

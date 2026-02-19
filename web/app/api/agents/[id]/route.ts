@@ -1,59 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAgentPublic, getAgent, updateAgentBalances, markAgentFunded, updateAgentStatus } from '@/lib/db';
 import { getAgentBalances, hasMinimumFunding } from '@/lib/balances';
-import { isPostgresConfigured, getAgentById, getAgentByWallet, initDatabase } from '@/lib/postgres';
-import path from 'path';
-import fs from 'fs';
+import { 
+  isPostgresConfigured, 
+  getAgentById, 
+  getAgentByWallet, 
+  getAgentWithKeys,
+  initDatabase,
+  updateAgentBalances as updateAgentBalancesPg,
+  markAgentFunded as markAgentFundedPg,
+  updateAgentStatus as updateAgentStatusPg
+} from '@/lib/postgres';
 
-// Check if we're in serverless environment
-const IS_SERVERLESS = process.env.VERCEL === '1' || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+export const dynamic = 'force-dynamic';
 
-// Lazy load better-sqlite3 (type as any to avoid build errors in serverless)
-let Database: any = null;
-if (!IS_SERVERLESS) {
-  try {
-    Database = require('better-sqlite3');
-  } catch (e) {
-    console.warn('[Agent API] better-sqlite3 not available');
-  }
-}
-
-const POOL_DB = path.join(process.env.HOME || '/tmp', '.automaton', 'credit_pool.db');
-const ACTIVITY_DB = path.join(process.env.HOME || '/tmp', '.automaton', 'activity.db');
-
+// For local dev: activity/credits from SQLite (optional fallback)
 function getAgentCredits(agentId: string): number | null {
-  if (IS_SERVERLESS || !Database) return null; // No data in serverless
-  try {
-    if (!fs.existsSync(POOL_DB)) return null;
-    const db = new Database(POOL_DB, { readonly: true });
-    const row = db.prepare('SELECT allocated_cents, used_cents FROM allocations WHERE agent_id = ?').get(agentId) as any;
-    db.close();
-    return row ? row.allocated_cents - row.used_cents : null;
-  } catch { return null; }
+  // Credits are now stored in Postgres via credits_balance
+  return null;
 }
 
 function getAgentStats(agentId: string): any {
-  if (IS_SERVERLESS || !Database) return { followers: 0, following: 0, interactions: 0 }; // No data in serverless
-  try {
-    if (!fs.existsSync(ACTIVITY_DB)) return { followers: 0, following: 0, interactions: 0 };
-    const db = new Database(ACTIVITY_DB, { readonly: true });
-    const followers = db.prepare('SELECT COUNT(*) as count FROM follows WHERE following_id = ?').get(agentId) as any;
-    const following = db.prepare('SELECT COUNT(*) as count FROM follows WHERE follower_id = ?').get(agentId) as any;
-    const interactions = db.prepare('SELECT COUNT(*) as count FROM activities WHERE agent_id = ?').get(agentId) as any;
-    db.close();
-    return { followers: followers?.count || 0, following: following?.count || 0, interactions: interactions?.count || 0 };
-  } catch { return { followers: 0, following: 0, interactions: 0 }; }
+  // Stats would come from a separate service or Postgres in production
+  return { followers: 0, following: 0, interactions: 0 };
 }
 
 function getAgentActivity(agentId: string): any[] {
-  if (IS_SERVERLESS || !Database) return []; // Empty in serverless
-  try {
-    if (!fs.existsSync(ACTIVITY_DB)) return [];
-    const db = new Database(ACTIVITY_DB, { readonly: true });
-    const activities = db.prepare('SELECT * FROM activities WHERE agent_id = ? ORDER BY created_at DESC LIMIT 20').all(agentId);
-    db.close();
-    return activities;
-  } catch { return []; }
+  // Activity would come from activity tables in Postgres
+  return [];
 }
 
 export async function GET(
@@ -63,20 +36,17 @@ export async function GET(
   try {
     let agent: any = null;
     
-    // Try Vercel Postgres first
-    if (isPostgresConfigured()) {
-      await initDatabase(); // Ensure tables exist
-      // Check if id looks like a wallet address
-      if (params.id.startsWith('0x') || params.id.length > 40) {
-        agent = await getAgentByWallet(params.id);
-      } else {
-        agent = await getAgentById(params.id);
-      }
+    if (!isPostgresConfigured()) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
     }
     
-    // Fall back to local DB
-    if (!agent) {
-      agent = getAgentPublic(params.id);
+    await initDatabase();
+    
+    // Check if id looks like a wallet address
+    if (params.id.startsWith('0x') || params.id.length > 40) {
+      agent = await getAgentByWallet(params.id);
+    } else {
+      agent = await getAgentById(params.id);
     }
 
     if (!agent) {
@@ -112,10 +82,17 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    if (!isPostgresConfigured()) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+    
+    await initDatabase();
+    
     const body = await request.json();
     const { action } = body;
 
-    const agent = getAgent(params.id);
+    // Get agent with keys for operations that need wallet addresses
+    const agent = await getAgentWithKeys(params.id);
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
@@ -125,17 +102,17 @@ export async function POST(
       const balances = await getAgentBalances(agent.solana_address, agent.evm_address);
 
       // Update database
-      updateAgentBalances(agent.id, {
+      await updateAgentBalancesPg(agent.id, {
         sol_balance: balances.sol,
         usdc_balance: balances.solanaUsdc + balances.baseUsdc,
       });
 
       // Check if newly funded
-      if (agent.status === 'pending_funding' && hasMinimumFunding(balances)) {
-        markAgentFunded(agent.id);
+      if (agent.status === 'pending' && hasMinimumFunding(balances)) {
+        await markAgentFundedPg(agent.id);
       }
 
-      const updatedAgent = getAgentPublic(agent.id);
+      const updatedAgent = await getAgentById(agent.id);
 
       return NextResponse.json({
         success: true,
@@ -154,8 +131,8 @@ export async function POST(
         );
       }
 
-      updateAgentStatus(agent.id, 'running');
-      const updatedAgent = getAgentPublic(agent.id);
+      await updateAgentStatusPg(agent.id, 'running');
+      const updatedAgent = await getAgentById(agent.id);
 
       return NextResponse.json({
         success: true,
@@ -165,8 +142,8 @@ export async function POST(
     }
 
     if (action === 'stop') {
-      updateAgentStatus(agent.id, 'stopped');
-      const updatedAgent = getAgentPublic(agent.id);
+      await updateAgentStatusPg(agent.id, 'stopped');
+      const updatedAgent = await getAgentById(agent.id);
 
       return NextResponse.json({
         success: true,

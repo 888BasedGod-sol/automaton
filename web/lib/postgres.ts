@@ -444,6 +444,116 @@ export async function updateAgentFunding(
   }
 }
 
+// Update agent balances (SOL, USDC)
+export async function updateAgentBalances(
+  agentId: string,
+  balances: { sol_balance?: number; usdc_balance?: number }
+): Promise<boolean> {
+  try {
+    const updates: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+    
+    if (balances.sol_balance !== undefined) {
+      updates.push(`sol_balance = $${paramIndex++}`);
+      params.push(balances.sol_balance);
+    }
+    if (balances.usdc_balance !== undefined) {
+      updates.push(`usdc_balance = $${paramIndex++}`);
+      params.push(balances.usdc_balance);
+    }
+    
+    if (updates.length === 0) return true;
+    
+    params.push(agentId);
+    await query(
+      `UPDATE agents SET ${updates.join(', ')} WHERE id = $${paramIndex}::uuid`,
+      params
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to update agent balances:', error);
+    return false;
+  }
+}
+
+// Mark agent as funded
+export async function markAgentFunded(agentId: string): Promise<boolean> {
+  try {
+    await query(
+      `UPDATE agents 
+      SET status = 'funded',
+          funded_at = CASE WHEN funded_at IS NULL THEN NOW() ELSE funded_at END
+      WHERE id = $1::uuid`,
+      [agentId]
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to mark agent funded:', error);
+    return false;
+  }
+}
+
+// Update agent status
+export async function updateAgentStatus(
+  agentId: string,
+  status: string
+): Promise<boolean> {
+  try {
+    const updates: string[] = ['status = $1'];
+    const params: any[] = [status];
+    
+    if (status === 'running') {
+      updates.push('started_at = CASE WHEN started_at IS NULL THEN NOW() ELSE started_at END');
+    }
+    
+    params.push(agentId);
+    await query(
+      `UPDATE agents SET ${updates.join(', ')} WHERE id = $${params.length}::uuid`,
+      params
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to update agent status:', error);
+    return false;
+  }
+}
+
+// Get agent with private keys (for internal operations only)
+export async function getAgentWithKeys(id: string): Promise<Agent | null> {
+  try {
+    const result = await query(
+      `SELECT * FROM agents WHERE id = $1::uuid`,
+      [id]
+    );
+    
+    if (result.rows.length === 0) return null;
+    return parseAgent(result.rows[0]);
+  } catch (error) {
+    console.error('[postgres] Failed to get agent with keys:', error);
+    return null;
+  }
+}
+
+// Update deposit status
+export async function updateDepositStatus(
+  txHash: string,
+  status: string
+): Promise<boolean> {
+  try {
+    await query(
+      `UPDATE credit_deposits 
+      SET status = $1, processed_at = NOW()
+      WHERE tx_hash = $2`,
+      [status, txHash]
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to update deposit status:', error);
+    return false;
+  }
+}
+
 // =====================
 // Social / Posts tables
 // =====================
