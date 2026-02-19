@@ -4,7 +4,7 @@ import { FC, useState } from 'react';
 import Link from 'next/link';
 import { 
   Users, LayoutDashboard, Menu, X, Cpu, Wallet, 
-  ChevronDown, Zap, Server, Activity, Network
+  ChevronDown, Zap, Server, Activity, Network, MessageCircle
 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import dynamic from 'next/dynamic';
@@ -41,6 +41,7 @@ export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
           <nav className="hidden md:flex items-center gap-1">
             <NavLink href="/agents" icon={<Users className="w-4 h-4" />}>Agents</NavLink>
             <NavLink href="/network" icon={<Network className="w-4 h-4" />}>Network</NavLink>
+            <NavLink href="/communicate" icon={<MessageCircle className="w-4 h-4" />}>Communicate</NavLink>
             <NavLink href="/dashboard" icon={<Activity className="w-4 h-4" />}>Dashboard</NavLink>
             <NavLink href="/infrastructure" icon={<Server className="w-4 h-4" />}>Infrastructure</NavLink>
             
@@ -91,6 +92,7 @@ export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
           <div className="px-4 py-3 space-y-1">
             <MobileNavLink href="/agents" onClick={() => setMobileMenuOpen(false)}>Agents</MobileNavLink>
             <MobileNavLink href="/network" onClick={() => setMobileMenuOpen(false)}>Network</MobileNavLink>
+            <MobileNavLink href="/communicate" onClick={() => setMobileMenuOpen(false)}>Communicate</MobileNavLink>
             <MobileNavLink href="/dashboard" onClick={() => setMobileMenuOpen(false)}>Dashboard</MobileNavLink>
             <MobileNavLink href="/infrastructure" onClick={() => setMobileMenuOpen(false)}>Infrastructure</MobileNavLink>
             <MobileNavLink href="/create" onClick={() => setMobileMenuOpen(false)} accent>Deploy Agent</MobileNavLink>

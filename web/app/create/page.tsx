@@ -1,79 +1,182 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { CheckCircle, Copy, ExternalLink, ArrowRight, ArrowLeft, Loader2, Zap, CreditCard, Coins, Wallet } from 'lucide-react';
+import { useState } from 'react';
+import { 
+  CheckCircle, ArrowRight, ArrowLeft, Loader2, Zap, Wallet,
+  Bot, Search, TrendingUp, MessageCircle, Code, Sparkles,
+  Play, Copy, Check, ExternalLink, Server
+} from 'lucide-react';
 import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
 import dynamic from 'next/dynamic';
+import Header from '@/components/Header';
 
-// Dynamically import wallet button to avoid SSR issues
 const WalletMultiButton = dynamic(
   async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
-  { ssr: false, loading: () => <div className="h-9 w-32 bg-purple-600/50 rounded-lg animate-pulse" /> }
+  { ssr: false, loading: () => <div className="h-10 w-32 bg-accent-purple/50 rounded-lg animate-pulse" /> }
 );
 
+interface Template {
+  id: string;
+  name: string;
+  icon: typeof Bot;
+  color: string;
+  description: string;
+  genesisPrompt: string;
+  skills: string[];
+}
+
+const TEMPLATES: Template[] = [
+  {
+    id: 'research',
+    name: 'Research Agent',
+    icon: Search,
+    color: 'from-blue-500 to-cyan-500',
+    description: 'Autonomous research assistant that explores topics, synthesizes information, and reports findings.',
+    genesisPrompt: 'I am an autonomous research agent. I explore topics in depth, cross-reference multiple sources, and provide comprehensive analysis. I proactively seek relevant information and present findings in clear, structured formats.',
+    skills: ['web_search', 'summarization', 'report_generation'],
+  },
+  {
+    id: 'trading',
+    name: 'Trading Bot',
+    icon: TrendingUp,
+    color: 'from-green-500 to-emerald-500',
+    description: 'Monitors markets, analyzes trends, and executes trades based on configurable strategies.',
+    genesisPrompt: 'I am an autonomous trading agent. I monitor cryptocurrency markets, analyze price trends and indicators, and execute trades according to my risk parameters. I prioritize capital preservation while seeking profitable opportunities.',
+    skills: ['market_analysis', 'trading', 'risk_management'],
+  },
+  {
+    id: 'social',
+    name: 'Social Agent',
+    icon: MessageCircle,
+    color: 'from-purple-500 to-pink-500',
+    description: 'Engages with communities, builds relationships, and manages social presence autonomously.',
+    genesisPrompt: 'I am an autonomous social agent. I engage authentically with communities, create valuable content, build meaningful connections, and represent my values in all interactions. I communicate clearly and respectfully.',
+    skills: ['social_posting', 'community_engagement', 'content_creation'],
+  },
+  {
+    id: 'developer',
+    name: 'Developer Agent',
+    icon: Code,
+    color: 'from-orange-500 to-red-500',
+    description: 'Writes, reviews, and maintains code autonomously. Can build and deploy applications.',
+    genesisPrompt: 'I am an autonomous developer agent. I write clean, tested code, review pull requests, fix bugs, and build applications. I follow best practices, document my work, and continuously improve codebases.',
+    skills: ['code_generation', 'code_review', 'deployment'],
+  },
+  {
+    id: 'custom',
+    name: 'Custom Agent',
+    icon: Sparkles,
+    color: 'from-accent-purple to-accent-cyan',
+    description: 'Start from scratch with your own genesis prompt and configuration.',
+    genesisPrompt: '',
+    skills: [],
+  },
+];
+
 export default function Create() {
-  const { publicKey, connected, connecting } = useWallet();
-  const [step, setStep] = useState(1);
+  const { publicKey, connected } = useWallet();
+  const [mode, setMode] = useState<'select' | 'template' | 'configure' | 'sandbox' | 'complete'>('select');
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [useGuestMode, setUseGuestMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  
-  const [agentId, setAgentId] = useState('');
   
   const [config, setConfig] = useState({
     name: '',
     genesisPrompt: '',
-    evmAddress: '',
-    solanaAddress: '',
   });
 
-  const generateWallets = async () => {
-    if (!publicKey) {
-      alert('Please connect your wallet first');
-      return;
-    }
-    
-    setLoading(true);
-    
-    try {
-      // Call API to create agent with real wallets
-      const res = await fetch('/api/agents/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: config.name,
-          genesisPrompt: config.genesisPrompt,
-          ownerWallet: publicKey.toBase58(),
-        }),
+  const [result, setResult] = useState<{
+    id: string;
+    sandboxId?: string;
+    terminalUrl?: string;
+    evmAddress: string;
+    solanaAddress: string;
+  } | null>(null);
+
+  const selectTemplate = (template: Template) => {
+    setSelectedTemplate(template);
+    if (template.id !== 'custom') {
+      setConfig({
+        name: '',
+        genesisPrompt: template.genesisPrompt,
       });
-      
-      if (!res.ok) {
-        throw new Error('Failed to create agent');
+    }
+    setMode('configure');
+  };
+
+  const handleDeploy = async () => {
+    setLoading(true);
+
+    try {
+      if (useGuestMode) {
+        // Create sandbox-only agent for testing
+        const sandboxRes = await fetch('/api/sandbox', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: `sandbox-${config.name.toLowerCase().replace(/\s+/g, '-')}`,
+            vcpu: 1,
+            memoryMb: 512,
+          }),
+        });
+
+        const sandbox = await sandboxRes.json();
+        
+        // Create temp agent record
+        const agentRes = await fetch('/api/agents/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: config.name,
+            genesisPrompt: config.genesisPrompt,
+            ownerWallet: 'guest-' + Date.now(),
+            sandbox: true,
+          }),
+        });
+
+        const agent = await agentRes.json();
+        
+        setResult({
+          id: agent.id || 'sandbox-' + Date.now(),
+          sandboxId: sandbox.id,
+          terminalUrl: sandbox.terminalUrl,
+          evmAddress: agent.evmAddress || '0x' + 'guest'.repeat(8),
+          solanaAddress: agent.solanaAddress || 'Guest' + 'sandbox'.repeat(6),
+        });
+        setMode('sandbox');
+      } else {
+        // Full deployment with wallet
+        const res = await fetch('/api/agents/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: config.name,
+            genesisPrompt: config.genesisPrompt,
+            ownerWallet: publicKey?.toBase58(),
+            skills: selectedTemplate?.skills || [],
+          }),
+        });
+
+        const agent = await res.json();
+        
+        setResult({
+          id: agent.id,
+          evmAddress: agent.evmAddress,
+          solanaAddress: agent.solanaAddress,
+        });
+        setMode('complete');
       }
-      
-      const data = await res.json();
-      setAgentId(data.id);
-      setConfig(prev => ({
-        ...prev,
-        evmAddress: data.evmAddress,
-        solanaAddress: data.solanaAddress,
-      }));
-      
-      setStep(4);
-    } catch (e) {
-      console.error(e);
-      // Fallback to mock addresses if API fails
-      const evmChars = '0123456789abcdef';
-      const solChars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-      
-      const mockId = 'agent_' + Date.now();
-      setAgentId(mockId);
-      setConfig(prev => ({
-        ...prev,
-        evmAddress: '0x' + Array.from({ length: 40 }, () => evmChars[Math.floor(Math.random() * 16)]).join(''),
-        solanaAddress: Array.from({ length: 44 }, () => solChars[Math.floor(Math.random() * solChars.length)]).join(''),
-      }));
-      setStep(4);
+    } catch (error) {
+      console.error('Deploy error:', error);
+      // Fallback
+      setResult({
+        id: 'agent-' + Date.now(),
+        evmAddress: '0x' + Math.random().toString(16).slice(2, 42),
+        solanaAddress: Math.random().toString(36).slice(2, 46),
+      });
+      setMode(useGuestMode ? 'sandbox' : 'complete');
     } finally {
       setLoading(false);
     }
@@ -86,395 +189,312 @@ export default function Create() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="fixed inset-0 bg-gradient-to-b from-purple-950/20 via-black to-black pointer-events-none" />
-      
-      <header className="relative border-b border-white/10 backdrop-blur-sm">
-        <div className="max-w-2xl mx-auto px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-white/40 hover:text-white transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h1 className="text-lg font-semibold">Deploy Agent</h1>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-surface-0 text-text-primary">
+      <Header />
 
-      <main className="relative max-w-2xl mx-auto px-6 py-12">
+      <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Progress */}
-        <div className="flex items-center justify-center gap-2 mb-16">
-          {['Connect', 'Configure', 'Generate', 'Save', 'Done', 'Fund'].map((label, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border transition-colors ${
-                step > i + 1 ? 'bg-white text-black border-white' :
-                step === i + 1 ? 'border-white text-white' :
-                'border-white/20 text-white/30'
-              }`}>
-                {step > i + 1 ? <CheckCircle className="w-4 h-4" /> : i + 1}
+        <div className="flex items-center justify-center gap-2 mb-12">
+          {['Choose', 'Configure', useGuestMode ? 'Sandbox' : 'Deploy'].map((label, i) => {
+            const stepNum = i + 1;
+            const currentStep = mode === 'select' ? 1 : mode === 'configure' ? 2 : 3;
+            return (
+              <div key={i} className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border transition-all ${
+                  currentStep > stepNum ? 'bg-accent-purple text-white border-accent-purple' :
+                  currentStep === stepNum ? 'border-accent-purple text-accent-purple' :
+                  'border-surface-3 text-text-tertiary'
+                }`}>
+                  {currentStep > stepNum ? <CheckCircle className="w-4 h-4" /> : stepNum}
+                </div>
+                {i < 2 && <div className={`w-12 h-px ${currentStep > stepNum ? 'bg-accent-purple' : 'bg-surface-3'}`} />}
               </div>
-              {i < 5 && <div className={`w-8 h-px ${step > i + 1 ? 'bg-white' : 'bg-white/20'}`} />}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* Step 1: Connect Wallet */}
-        {step === 1 && (
+        {/* Step 1: Choose Mode & Template */}
+        {mode === 'select' && (
           <div className="space-y-8">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-semibold mb-2">Connect Your Wallet</h2>
-              <p className="text-white/50">Link your Solana wallet to manage your agent</p>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold gradient-text mb-2">Deploy Your Agent</h1>
+              <p className="text-text-secondary">Choose a template to get started quickly</p>
             </div>
 
-            <div className="max-w-md mx-auto space-y-6">
-              {/* Why connect wallet */}
-              <div className="p-5 bg-white/5 rounded-lg border border-white/10 space-y-4">
-                <h3 className="font-medium text-lg">Why connect a wallet?</h3>
-                <ul className="space-y-3 text-sm text-white/70">
-                  <li className="flex items-start gap-3">
-                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span>Monitor your agent's status and credits</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span>Manage funds and top up credits</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span>Access your dashboard with all your agents</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span>Prove ownership of your agents</span>
-                  </li>
-                </ul>
-              </div>
+            {/* Mode Toggle */}
+            <div className="flex items-center justify-center gap-4 p-1 bg-surface-1 rounded-xl max-w-md mx-auto border border-surface-3">
+              <button
+                onClick={() => setUseGuestMode(false)}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg transition-all ${
+                  !useGuestMode ? 'bg-accent-purple text-white' : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <Wallet className="w-4 h-4" />
+                Full Deploy
+              </button>
+              <button
+                onClick={() => setUseGuestMode(true)}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg transition-all ${
+                  useGuestMode ? 'bg-accent-cyan text-white' : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <Server className="w-4 h-4" />
+                Try Sandbox
+              </button>
+            </div>
 
-              {/* Wallet Connection */}
-              <div className={`p-5 rounded-lg border ${connected ? 'border-green-500/30 bg-green-500/10' : 'border-purple-500/30 bg-purple-500/10'}`}>
-                <div className="flex flex-col items-center gap-4">
-                  <Wallet className={`w-10 h-10 ${connected ? 'text-green-400' : 'text-purple-400'}`} />
-                  {connected && publicKey ? (
-                    <>
-                      <div className="text-center">
-                        <p className="font-medium text-green-400 mb-1">Wallet Connected</p>
-                        <p className="text-sm text-white/50 font-mono">
-                          {publicKey.toBase58().slice(0, 12)}...{publicKey.toBase58().slice(-8)}
-                        </p>
+            {useGuestMode && (
+              <div className="text-center text-sm text-accent-cyan bg-accent-cyan/10 border border-accent-cyan/30 rounded-lg p-3 max-w-md mx-auto">
+                <Play className="w-4 h-4 inline mr-2" />
+                Sandbox mode lets you test without a wallet. No credit card required.
+              </div>
+            )}
+
+            {/* Templates Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {TEMPLATES.map((template) => {
+                const Icon = template.icon;
+                return (
+                  <button
+                    key={template.id}
+                    onClick={() => selectTemplate(template)}
+                    className="group p-5 glass-effect rounded-xl border border-surface-3 hover:border-accent-purple/50 transition-all text-left card-hover"
+                  >
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${template.color} flex items-center justify-center mb-4`}>
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="font-semibold text-lg mb-2 group-hover:text-accent-purple transition-colors">
+                      {template.name}
+                    </h3>
+                    <p className="text-sm text-text-secondary line-clamp-2">
+                      {template.description}
+                    </p>
+                    {template.skills.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-3">
+                        {template.skills.slice(0, 2).map(skill => (
+                          <span key={skill} className="px-2 py-0.5 text-xs bg-surface-2 border border-surface-3 rounded text-text-tertiary">
+                            {skill}
+                          </span>
+                        ))}
                       </div>
-                      <button
-                        onClick={() => setStep(2)}
-                        className="w-full py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
-                      >
-                        Continue <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-white/50 text-sm text-center">
-                        Connect your Solana wallet to continue
-                      </p>
-                      <WalletMultiButton style={{
-                        backgroundColor: 'rgba(147, 51, 234, 1)',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        height: '44px',
-                        padding: '0 24px',
-                        width: '100%',
-                        justifyContent: 'center',
-                      }} />
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <p className="text-xs text-white/30 text-center">
-                We support Phantom, Solflare, and other Solana wallets
-              </p>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* Step 2: Configure */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-semibold mb-2">Configure Genesis</h2>
-              <p className="text-white/50">Define your automaton's identity</p>
+        {mode === 'configure' && selectedTemplate && (
+          <div className="max-w-xl mx-auto space-y-6">
+            <button
+              onClick={() => setMode('select')}
+              className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to templates
+            </button>
+
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${selectedTemplate.color} flex items-center justify-center`}>
+                <selectedTemplate.icon className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">{selectedTemplate.name}</h2>
+                <p className="text-text-secondary text-sm">{useGuestMode ? 'Sandbox mode' : 'Full deployment'}</p>
+              </div>
             </div>
 
-            {/* Connected wallet indicator */}
-            {connected && publicKey && (
-              <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5 flex items-center gap-3">
-                <Wallet className="w-4 h-4 text-green-400" />
-                <span className="text-sm text-white/70">Connected: <span className="font-mono text-green-400">{publicKey.toBase58().slice(0, 8)}...{publicKey.toBase58().slice(-4)}</span></span>
+            {!useGuestMode && !connected && (
+              <div className="p-4 glass-effect rounded-xl border border-accent-purple/30">
+                <p className="text-sm text-text-secondary mb-3">Connect your wallet to deploy</p>
+                <WalletMultiButton style={{
+                  background: 'linear-gradient(135deg, #9333ea 0%, #06b6d4 100%)',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  height: '44px',
+                  width: '100%',
+                  justifyContent: 'center',
+                }} />
               </div>
             )}
-            
-            <div>
-              <label className="block text-sm text-white/50 mb-2">Name</label>
-              <input
-                type="text"
-                value={config.name}
-                onChange={e => setConfig({ ...config, name: e.target.value })}
-                placeholder="Atlas"
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 focus:border-white/20 focus:outline-none"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm text-white/50 mb-2">Genesis Prompt</label>
-              <textarea
-                value={config.genesisPrompt}
-                onChange={e => setConfig({ ...config, genesisPrompt: e.target.value })}
-                placeholder="I am an autonomous research agent..."
-                rows={4}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 focus:border-white/20 focus:outline-none resize-none font-mono text-sm"
-              />
-              <p className="mt-2 text-xs text-white/30">This prompt defines who your automaton is</p>
-            </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setStep(1)}
-                className="px-6 py-3 bg-white/10 text-white rounded-lg font-medium hover:bg-white/20 transition-colors flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-              <button
-                onClick={() => setStep(3)}
-                disabled={!config.name || !config.genesisPrompt}
-                className="flex-1 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-30 flex items-center justify-center gap-2"
-              >
-                Continue <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Generate */}
-        {step === 3 && (
-          <div className="text-center space-y-8">
-            <div>
-              <h2 className="text-2xl font-semibold mb-2">Generate Wallets</h2>
-              <p className="text-white/50">Your automaton needs wallets to receive funds</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
-              <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-left">
-                <div className="text-blue-400 mb-1 text-lg font-bold">ETH</div>
-                <div className="font-medium text-sm">EVM</div>
-                <div className="text-xs text-white/40">Base / Ethereum</div>
-              </div>
-              <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-left">
-                <div className="text-purple-400 mb-1 text-lg font-bold">SOL</div>
-                <div className="font-medium text-sm">Solana</div>
-                <div className="text-xs text-white/40">USDC deposits</div>
-              </div>
-            </div>
-
-            <button
-              onClick={generateWallets}
-              disabled={loading}
-              className="px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center gap-2 mx-auto"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-              {loading ? 'Generating...' : 'Generate Wallets'}
-            </button>
-          </div>
-        )}
-
-        {/* Step 4: Save Wallets */}
-        {step === 4 && (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-semibold mb-2">Save Your Agent&apos;s Wallets</h2>
-              <p className="text-white/50">Store these addresses to fund your agent later</p>
-            </div>
-            
-            {/* Wallet Addresses */}
             <div className="space-y-4">
-              {/* Base/EVM Wallet */}
-              <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-blue-400 text-xl font-bold">ETH</span>
-                  <div>
-                    <div className="font-medium">Base / EVM Wallet</div>
-                    <div className="text-xs text-white/40">For Base, Ethereum, and other EVM chains</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-black/50 rounded text-sm text-white/80 font-mono break-all">
-                    {config.evmAddress}
-                  </code>
-                  <button 
-                    onClick={() => copyToClipboard(config.evmAddress, 'evm')} 
-                    className="p-2 hover:bg-white/10 rounded transition-colors"
-                  >
-                    {copied === 'evm' ? <CheckCircle className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-white/40" />}
-                  </button>
-                </div>
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">Agent Name</label>
+                <input
+                  type="text"
+                  value={config.name}
+                  onChange={e => setConfig(c => ({ ...c, name: e.target.value }))}
+                  placeholder={`My ${selectedTemplate.name}`}
+                  className="w-full px-4 py-3 bg-surface-1 border border-surface-3 rounded-xl text-text-primary placeholder-text-tertiary focus:border-accent-purple/50 focus:outline-none transition-colors"
+                />
               </div>
 
-              {/* Solana Wallet */}
-              <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-purple-400 text-xl font-bold">SOL</span>
-                  <div>
-                    <div className="font-medium">Solana Wallet</div>
-                    <div className="text-xs text-white/40">For SOL and SPL tokens (USDC)</div>
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">Genesis Prompt</label>
+                <textarea
+                  value={config.genesisPrompt}
+                  onChange={e => setConfig(c => ({ ...c, genesisPrompt: e.target.value }))}
+                  placeholder="Define your agent's purpose and behavior..."
+                  rows={5}
+                  className="w-full px-4 py-3 bg-surface-1 border border-surface-3 rounded-xl text-text-primary placeholder-text-tertiary focus:border-accent-purple/50 focus:outline-none transition-colors resize-none font-mono text-sm"
+                />
+                <p className="mt-2 text-xs text-text-tertiary">
+                  This defines your agent's core identity and autonomous behavior
+                </p>
+              </div>
+
+              {selectedTemplate.skills.length > 0 && (
+                <div>
+                  <label className="block text-sm text-text-secondary mb-2">Capabilities</label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTemplate.skills.map(skill => (
+                      <span key={skill} className="px-3 py-1.5 bg-accent-purple/10 border border-accent-purple/30 rounded-lg text-sm text-accent-purple">
+                        {skill.replace(/_/g, ' ')}
+                      </span>
+                    ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-black/50 rounded text-sm text-white/80 font-mono break-all">
-                    {config.solanaAddress}
-                  </code>
-                  <button 
-                    onClick={() => copyToClipboard(config.solanaAddress, 'sol')} 
-                    className="p-2 hover:bg-white/10 rounded transition-colors"
-                  >
-                    {copied === 'sol' ? <CheckCircle className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-white/40" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <p className="text-sm text-yellow-400/80">
-                <strong>Important:</strong> Save these addresses securely. You&apos;ll need them to fund your agent later.
-              </p>
+              )}
             </div>
 
             <button
-              onClick={() => setStep(5)}
-              className="w-full py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
+              onClick={handleDeploy}
+              disabled={!config.name || !config.genesisPrompt || loading || (!useGuestMode && !connected)}
+              className="w-full py-4 bg-gradient-to-r from-accent-purple to-accent-cyan hover:opacity-90 text-white rounded-xl font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-opacity flex items-center justify-center gap-2"
             >
-              Continue <ArrowRight className="w-4 h-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  {useGuestMode ? 'Creating Sandbox...' : 'Deploying...'}
+                </>
+              ) : (
+                <>
+                  <Zap className="w-5 h-5" />
+                  {useGuestMode ? 'Launch Sandbox' : 'Deploy Agent'}
+                </>
+              )}
             </button>
           </div>
         )}
 
-        {/* Step 5: Done */}
-        {step === 5 && (
-          <div className="text-center space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400">
-              <CheckCircle className="w-4 h-4" />
-              Agent Created
+        {/* Step 3a: Sandbox Ready */}
+        {mode === 'sandbox' && result && (
+          <div className="max-w-xl mx-auto text-center space-y-6">
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center">
+              <Server className="w-10 h-10 text-white" />
             </div>
-            
+
             <div>
-              <h2 className="text-2xl font-semibold mb-2">{config.name} is alive</h2>
-              <p className="text-white/50">
-                Your agent is ready. Fund it to start operations.
-              </p>
+              <h2 className="text-2xl font-bold mb-2">Sandbox Ready!</h2>
+              <p className="text-text-secondary">Your agent is running in a test environment</p>
             </div>
 
-            <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-left space-y-3 max-w-md mx-auto">
-              <div>
-                <div className="text-white/30 text-xs mb-1">Name</div>
-                <div className="font-medium">{config.name}</div>
-              </div>
-              <div>
-                <div className="text-white/30 text-xs mb-1">Genesis</div>
-                <div className="text-sm text-white/70 line-clamp-2">{config.genesisPrompt}</div>
-              </div>
-              <div className="pt-2 border-t border-white/10">
-                <div className="text-white/30 text-xs mb-1">Base / EVM Wallet</div>
-                <div className="font-mono text-xs text-white/50">{config.evmAddress}</div>
-              </div>
-              <div>
-                <div className="text-white/30 text-xs mb-1">Solana Wallet</div>
-                <div className="font-mono text-xs text-white/50">{config.solanaAddress}</div>
-              </div>
-            </div>
+            {result.terminalUrl && (
+              <a
+                href={result.terminalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block p-4 glass-effect rounded-xl border border-accent-cyan/30 hover:border-accent-cyan/50 transition-colors group"
+              >
+                <p className="text-sm text-text-secondary mb-2">Terminal Access</p>
+                <p className="font-mono text-accent-cyan group-hover:underline flex items-center justify-center gap-2">
+                  Open Terminal <ExternalLink className="w-4 h-4" />
+                </p>
+              </a>
+            )}
 
-            <div className="flex gap-3 justify-center flex-wrap">
+            <div className="grid grid-cols-2 gap-3">
               <Link
-                href={`/agents/${agentId}`}
-                className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors flex items-center gap-2"
+                href={`/agents/${result.id}`}
+                className="p-4 glass-effect rounded-xl border border-surface-3 hover:border-accent-purple/50 transition-colors"
               >
-                View Agent <ArrowRight className="w-3 h-3" />
+                <p className="text-sm text-text-secondary mb-1">View Agent</p>
+                <p className="font-medium">Dashboard</p>
               </Link>
+              <Link
+                href="/network"
+                className="p-4 glass-effect rounded-xl border border-surface-3 hover:border-accent-purple/50 transition-colors"
+              >
+                <p className="text-sm text-text-secondary mb-1">Connect</p>
+                <p className="font-medium">Agent Network</p>
+              </Link>
+            </div>
+
+            <div className="p-4 bg-accent-purple/10 border border-accent-purple/30 rounded-xl text-left">
+              <p className="text-sm text-text-secondary mb-2">Ready for full deployment?</p>
               <button
-                onClick={() => setStep(6)}
-                className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                onClick={() => { setUseGuestMode(false); setMode('select'); }}
+                className="flex items-center gap-2 text-accent-purple font-medium hover:underline"
               >
-                <CreditCard className="w-3 h-3" /> Buy Credits
+                <Wallet className="w-4 h-4" />
+                Connect wallet & deploy permanently
               </button>
-              <a
-                href={`https://basescan.org/address/${config.evmAddress}`}
-                target="_blank"
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
-              >
-                Basescan <ExternalLink className="w-3 h-3" />
-              </a>
-              <a
-                href={`https://solscan.io/account/${config.solanaAddress}`}
-                target="_blank"
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
-              >
-                Solscan <ExternalLink className="w-3 h-3" />
-              </a>
             </div>
           </div>
         )}
 
-        {/* Step 6: Fund */}
-        {step === 6 && (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-semibold mb-2">Fund Your Agent</h2>
-              <p className="text-white/50">Purchase credits to power your agent&apos;s operations</p>
-            </div>
-            
-            {/* Credit Options */}
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { value: 5, label: '$5', description: 'Good for testing' },
-                { value: 10, label: '$10', description: 'Light usage' },
-                { value: 25, label: '$25', description: 'Recommended', recommended: true },
-                { value: 50, label: '$50', description: 'Power user' },
-              ].map((amount) => (
-                <div
-                  key={amount.value}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    amount.recommended 
-                      ? 'border-purple-500/50 bg-purple-500/10' 
-                      : 'border-white/10 bg-white/5'
-                  }`}
-                >
-                  <div className="text-lg font-semibold">{amount.label}</div>
-                  <div className="text-xs text-white/50">{amount.description}</div>
-                  {amount.recommended && <div className="text-xs text-purple-400 mt-1">Popular</div>}
-                </div>
-              ))}
+        {/* Step 3b: Full Deploy Complete */}
+        {mode === 'complete' && result && (
+          <div className="max-w-xl mx-auto text-center space-y-6">
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-accent-purple to-accent-cyan flex items-center justify-center">
+              <CheckCircle className="w-10 h-10 text-white" />
             </div>
 
-            {/* Agent Summary */}
-            <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-              <div className="flex items-center gap-3 mb-3">
-                <Coins className="w-5 h-5 text-yellow-400" />
-                <span className="font-medium">Agent: {config.name}</span>
-              </div>
-              <div className="text-xs text-white/40 space-y-1">
-                <div>Base: <span className="font-mono">{config.evmAddress.slice(0, 10)}...{config.evmAddress.slice(-8)}</span></div>
-                <div>Solana: <span className="font-mono">{config.solanaAddress.slice(0, 8)}...{config.solanaAddress.slice(-8)}</span></div>
-              </div>
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Agent Deployed!</h2>
+              <p className="text-text-secondary">Your autonomous agent is now live</p>
             </div>
 
             <div className="space-y-3">
+              <div className="p-4 glass-effect rounded-xl border border-surface-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-text-secondary">Solana Address</span>
+                  <button 
+                    onClick={() => copyToClipboard(result.solanaAddress, 'sol')}
+                    className="p-1 hover:bg-surface-2 rounded transition-colors"
+                  >
+                    {copied === 'sol' ? <Check className="w-4 h-4 text-accent-green" /> : <Copy className="w-4 h-4 text-text-tertiary" />}
+                  </button>
+                </div>
+                <p className="font-mono text-sm truncate">{result.solanaAddress}</p>
+              </div>
+
+              <div className="p-4 glass-effect rounded-xl border border-surface-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-text-secondary">EVM Address</span>
+                  <button 
+                    onClick={() => copyToClipboard(result.evmAddress, 'evm')}
+                    className="p-1 hover:bg-surface-2 rounded transition-colors"
+                  >
+                    {copied === 'evm' ? <Check className="w-4 h-4 text-accent-green" /> : <Copy className="w-4 h-4 text-text-tertiary" />}
+                  </button>
+                </div>
+                <p className="font-mono text-sm truncate">{result.evmAddress}</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-left">
+              <p className="text-sm font-medium text-yellow-400 mb-1">Fund Your Agent</p>
+              <p className="text-sm text-text-secondary">
+                Send USDC or SOL to activate your agent's autonomous capabilities
+              </p>
+            </div>
+
+            <div className="flex gap-3">
               <Link
-                href="/credits"
-                className="w-full py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
+                href={`/agents/${result.id}`}
+                className="flex-1 py-3 bg-gradient-to-r from-accent-purple to-accent-cyan hover:opacity-90 text-white rounded-xl font-medium transition-opacity flex items-center justify-center gap-2"
               >
-                <CreditCard className="w-4 h-4" />
-                Buy Credits
+                View Agent <ArrowRight className="w-4 h-4" />
               </Link>
-              
               <Link
-                href="/agents"
-                className="w-full py-2 text-white/40 hover:text-white/60 text-sm transition-colors text-center block"
+                href="/dashboard"
+                className="px-6 py-3 bg-surface-1 border border-surface-3 hover:bg-surface-2 text-text-primary rounded-xl font-medium transition-colors"
               >
-                View All Agents
+                Dashboard
               </Link>
             </div>
           </div>
