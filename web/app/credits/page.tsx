@@ -40,7 +40,17 @@ export default function CreditsPage() {
   const [userBaseAddress, setUserBaseAddress] = useState('');
   const [selectedAsset, setSelectedAsset] = useState<'usdc' | 'sol'>('usdc');
   const [claiming, setClaiming] = useState(false);
-  const [claimResult, setClaimResult] = useState<{ success: boolean; message: string; txHash?: string; senderWallet?: string; agentWallet?: string; amount?: number; note?: string } | null>(null);
+  const [claimResult, setClaimResult] = useState<{ 
+    success: boolean; 
+    message: string; 
+    txHash?: string; 
+    senderWallet?: string; 
+    agentWallet?: string; 
+    amount?: number; 
+    note?: string;
+    creditsAdded?: number;
+    agentBalance?: number;
+  } | null>(null);
 
   useEffect(() => {
     fetchTreasury();
@@ -122,6 +132,8 @@ export default function CreditsPage() {
         agentWallet: data.agentWallet,
         amount: data.amount,
         note: data.note,
+        creditsAdded: data.creditsAdded,
+        agentBalance: data.agentBalance,
       });
       
       if (data.success) {
@@ -177,7 +189,7 @@ export default function CreditsPage() {
               <ol className="space-y-2 text-sm text-white/70">
                 <li className="flex gap-2">
                   <span className="text-purple-400 font-mono">1.</span>
-                  <span>Choose amount and send USDC to treasury address below</span>
+                  <span>Send SOL or USDC to treasury address below</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="text-purple-400 font-mono">2.</span>
@@ -185,11 +197,11 @@ export default function CreditsPage() {
                 </li>
                 <li className="flex gap-2">
                   <span className="text-purple-400 font-mono">3.</span>
-                  <span>Paste signature below with your agent&apos;s Base wallet</span>
+                  <span>Enter your agent&apos;s Base wallet address</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="text-purple-400 font-mono">4.</span>
-                  <span>Click verify - credits will be sent to your agent</span>
+                  <span>Click verify - <strong>Conway credits</strong> will be added to your agent</span>
                 </li>
               </ol>
             </div>
@@ -333,7 +345,12 @@ export default function CreditsPage() {
                     )}
                     {claimResult.amount && (
                       <div className="text-white/50">
-                        Amount: ${claimResult.amount.toFixed(2)} USD
+                        Credits Added: ${claimResult.amount.toFixed(2)}
+                      </div>
+                    )}
+                    {claimResult.agentBalance !== undefined && (
+                      <div className="text-green-300 font-medium">
+                        Agent Balance: ${claimResult.agentBalance.toFixed(2)}
                       </div>
                     )}
                     {claimResult.note && (

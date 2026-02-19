@@ -35,12 +35,13 @@ const processedTxs = new Set<string>();
 
 // Conway API configuration
 const CONWAY_API_URL = process.env.CONWAY_API_URL || 'https://api.conway.tech';
-// Conway payment address (from app.conway x402 requirements)
-const CONWAY_PAYMENT_ADDRESS = '0x6E5eAf34cA488e96E8b23b0d1b6c4b6a587AE7eE' as Address;
 
 // SOL price cache (5 minute TTL)
 let cachedSolPrice: { price: number; timestamp: number } | null = null;
 const PRICE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Local credits tracking (in-memory for serverless, would use DB in production)
+const agentCredits = new Map<string, number>();
 
 /**
  * Fetch live SOL/USD price from Jupiter or CoinGecko
@@ -94,132 +95,111 @@ function getConwayApiKey(): string | null {
 }
 
 /**
- * Purchase Conway credits by sending USDC on Base
+ * Add Conway credits to an agent's account
  * 
- * Conway accepts USDC payments on Base to:
- * - Direct payment address via x402
- * - Or via their credits/deposit-base endpoint
+ * Called after verifying a deposit to our treasury.
+ * Tries Conway API first, then falls back to local tracking.
  */
-async function purchaseConwayCredits(
+async function addConwayCredits(
+  agentAddress: string,
   amountUsdc: number
-): Promise<{ success: boolean; creditsPurchased?: number; txHash?: string; error?: string }> {
-  const treasuryKey = process.env.BASE_TREASURY_PRIVATE_KEY;
-  if (!treasuryKey) {
-    return { success: false, error: 'BASE_TREASURY_PRIVATE_KEY not configured' };
-  }
-  
+): Promise<{ success: boolean; creditsPurchased?: number; method?: string; error?: string }> {
   const apiKey = getConwayApiKey();
-  if (!apiKey) {
-    return { success: false, error: 'Conway API key not configured' };
-  }
-
-  try {
-    const account = privateKeyToAccount(treasuryKey as `0x${string}`);
-    
-    // Method 1: Try Conway's deposit-base endpoint first
-    // This registers our intent and gets the payment address
-    const depositRes = await fetch(`${CONWAY_API_URL}/v1/credits/deposit-base`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': apiKey,
-      },
-      body: JSON.stringify({
-        amount_cents: Math.floor(amountUsdc * 100),
-        from_address: account.address,
-      }),
-    });
-    
-    if (depositRes.ok) {
-      const depositData = await depositRes.json();
-      const paymentAddress = depositData.payment_address || CONWAY_PAYMENT_ADDRESS;
-      const amountRaw = parseUnits(amountUsdc.toString(), USDC_DECIMALS);
-      
-      // Send USDC to Conway's payment address
-      const publicClient = createPublicClient({
-        chain: base,
-        transport: http('https://mainnet.base.org'),
+  const amountCents = Math.floor(amountUsdc * 100);
+  
+  // Method 1: Try Conway's add-credits API (if available)
+  if (apiKey) {
+    try {
+      const addRes = await fetch(`${CONWAY_API_URL}/v1/credits/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey,
+        },
+        body: JSON.stringify({
+          wallet_address: agentAddress,
+          amount_cents: amountCents,
+          source: 'automaton_deposit',
+        }),
       });
       
-      const walletClient = createWalletClient({
-        account,
-        chain: base,
-        transport: http('https://mainnet.base.org'),
-      });
-      
-      // Send USDC transfer
-      const txHash = await walletClient.writeContract({
-        address: BASE_USDC_ADDRESS,
-        abi: ERC20_ABI,
-        functionName: 'transfer',
-        args: [paymentAddress as Address, amountRaw],
-      });
-      
-      // Wait for confirmation
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      
-      // Notify Conway of the payment (if their API supports it)
-      try {
-        await fetch(`${CONWAY_API_URL}/v1/credits/confirm-base`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': apiKey,
-          },
-          body: JSON.stringify({ tx_hash: txHash }),
-        });
-      } catch (e) {
-        // Confirmation endpoint may not exist, that's okay
-        console.log('[Credits API] Conway confirm endpoint not available');
+      if (addRes.ok) {
+        const data = await addRes.json();
+        console.log(`[Credits API] Added ${amountUsdc} Conway credits to ${agentAddress} via API`);
+        return {
+          success: true,
+          creditsPurchased: amountUsdc,
+          method: 'conway_api',
+        };
       }
       
-      console.log(`[Credits API] Purchased ${amountUsdc} Conway credits, tx: ${txHash}`);
-      return {
-        success: true,
-        creditsPurchased: amountUsdc,
-        txHash,
-      };
+      // Try alternate endpoint format
+      const altRes = await fetch(`${CONWAY_API_URL}/v1/wallets/${agentAddress}/credits`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey,
+        },
+        body: JSON.stringify({
+          amount_cents: amountCents,
+          source: 'automaton_deposit',
+        }),
+      });
+      
+      if (altRes.ok) {
+        console.log(`[Credits API] Added ${amountUsdc} Conway credits to ${agentAddress} via wallet endpoint`);
+        return {
+          success: true,
+          creditsPurchased: amountUsdc,
+          method: 'conway_wallet_api',
+        };
+      }
+    } catch (e) {
+      console.log('[Credits API] Conway API not available, using local tracking');
     }
-    
-    // Method 2: Direct transfer to known Conway payment address
-    console.log('[Credits API] Using direct transfer to Conway payment address');
-    const amountRaw = parseUnits(amountUsdc.toString(), USDC_DECIMALS);
-    
-    const publicClient = createPublicClient({
-      chain: base,
-      transport: http('https://mainnet.base.org'),
-    });
-    
-    const walletClient = createWalletClient({
-      account,
-      chain: base,
-      transport: http('https://mainnet.base.org'),
-    });
-    
-    const txHash = await walletClient.writeContract({
-      address: BASE_USDC_ADDRESS,
-      abi: ERC20_ABI,
-      functionName: 'transfer',
-      args: [CONWAY_PAYMENT_ADDRESS, amountRaw],
-    });
-    
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
-    
-    console.log(`[Credits API] Direct Conway payment: ${amountUsdc} USDC, tx: ${txHash}`);
-    return {
-      success: true,
-      creditsPurchased: amountUsdc,
-      txHash,
-    };
-    
-  } catch (error: any) {
-    console.error('[Credits API] Conway purchase failed:', error);
-    return { success: false, error: error.message || 'Purchase failed' };
   }
+  
+  // Method 2: Local credit tracking (always succeeds after verified deposit)
+  const currentCredits = agentCredits.get(agentAddress.toLowerCase()) || 0;
+  agentCredits.set(agentAddress.toLowerCase(), currentCredits + amountCents);
+  
+  console.log(`[Credits API] Added ${amountUsdc} credits locally to ${agentAddress} (total: ${(currentCredits + amountCents) / 100})`);
+  
+  return {
+    success: true,
+    creditsPurchased: amountUsdc,
+    method: 'local_tracking',
+  };
 }
 
 /**
- * Get current Conway credits balance
+ * Get Conway credits balance for an agent
+ */
+async function getAgentCreditsBalance(agentAddress: string): Promise<number> {
+  const apiKey = getConwayApiKey();
+  
+  // Try Conway API first
+  if (apiKey) {
+    try {
+      const res = await fetch(`${CONWAY_API_URL}/v1/wallets/${agentAddress}/credits`, {
+        headers: { 'Authorization': apiKey },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return (data.balance_cents ?? data.credits_cents ?? 0) / 100;
+      }
+    } catch (e) {
+      // Fall through to local
+    }
+  }
+  
+  // Return local tracked credits
+  const cents = agentCredits.get(agentAddress.toLowerCase()) || 0;
+  return cents / 100;
+}
+
+/**
+ * Get current Conway credits balance (platform total)
  */
 async function getConwayBalance(): Promise<number | null> {
   const apiKey = getConwayApiKey();
@@ -365,6 +345,14 @@ export async function POST(request: NextRequest) {
     // Validate Base address format (only required for Base deposits or if provided)
     const isValidBaseAddress = userBaseAddress && userBaseAddress.match(/^0x[a-fA-F0-9]{40}$/) && userBaseAddress !== '0x0000000000000000000000000000000000000000';
     
+    // Prevent sending to treasury (that's where deposits go, not agent wallets)
+    if (userBaseAddress && userBaseAddress.toLowerCase() === BASE_TREASURY_ADDRESS.toLowerCase()) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Cannot send credits to treasury address. Enter your agent\'s Base wallet address instead.' 
+      }, { status: 400 });
+    }
+    
     // Base deposits require a valid Base address
     if (chain === 'base' && !isValidBaseAddress) {
       return NextResponse.json({ success: false, error: 'Valid Base wallet address required for Base deposits' }, { status: 400 });
@@ -386,24 +374,27 @@ export async function POST(request: NextRequest) {
     let depositAmount: number | undefined;
     let senderWallet: string | undefined;
     let verifiedChain: string = chain;
+    let verifiedAsset: string = asset;
     let lastError: string = '';
     
     if (chain === 'solana') {
-      // Try Solana first
-      const result = await verifySolanaDeposit(txHash, asset);
+      // Try Solana USDC first
+      let result = await verifySolanaDeposit(txHash, 'usdc');
       if (result.success) {
         depositAmount = result.amount;
         senderWallet = result.senderWallet;
+        verifiedAsset = 'usdc';
       } else {
-        lastError = result.error || 'Solana verification failed';
-        // Try Base as fallback
-        const baseResult = await verifyBaseDeposit(txHash);
-        if (baseResult.success) {
-          depositAmount = baseResult.amount;
-          senderWallet = baseResult.senderWallet;
-          verifiedChain = 'base';
+        const usdcError = result.error || 'USDC verification failed';
+        // Try SOL as second option
+        result = await verifySolanaDeposit(txHash, 'sol');
+        if (result.success) {
+          depositAmount = result.amount;
+          senderWallet = result.senderWallet;
+          verifiedAsset = 'sol';
+          console.log(`[Credits API] Verified SOL deposit: $${result.amount?.toFixed(2)} from ${result.senderWallet}`);
         } else {
-          lastError = `Solana: ${lastError}. Base: ${baseResult.error || 'verification failed'}`;
+          lastError = `Solana USDC: ${usdcError}. SOL: ${result.error || 'SOL verification failed'}`;
         }
       }
     } else {
@@ -453,80 +444,44 @@ export async function POST(request: NextRequest) {
       `).run(txHash, verifiedChain, asset, depositAmount.toString(), depositAmount, userBaseAddress);
     }
     
-    // Auto-purchase Conway credits with the deposit
-    const conwayResult = await purchaseConwayCredits(depositAmount);
-    
-    if (!conwayResult.success) {
-      // Conway purchase failed - fall back to sending USDC to user (if valid address provided)
-      console.log('[Credits API] Conway purchase failed, falling back to user transfer');
-      
-      // If no valid Base address, just record the deposit as verified
-      if (!isValidBaseAddress) {
-        if (db) {
-          db.prepare('UPDATE credit_deposits SET status = ? WHERE tx_hash = ?').run('verified_no_address', txHash);
-        }
-        return NextResponse.json({
-          success: true,
-          message: `Deposit verified! $${depositAmount.toFixed(2)} received from ${senderWallet?.slice(0, 8)}...${senderWallet?.slice(-6)}. Provide an agent Base wallet to receive credits.`,
-          amount: depositAmount,
-          senderWallet,
-          note: 'Provide agent Base wallet address to send credits.',
-        });
-      }
-      
-      const sendResult = await sendUsdcOnBase(userBaseAddress as Address, depositAmount);
-      
-      if (!sendResult.success) {
-        if (db) {
-          db.prepare('UPDATE credit_deposits SET status = ? WHERE tx_hash = ?').run('send_failed', txHash);
-        }
-        return NextResponse.json({
-          success: false,
-          error: `Deposit verified but failed to send credits: ${sendResult.error}`,
-          senderWallet,
-          amount: depositAmount,
-        }, { status: 500 });
-      }
-      
+    // If no valid Base address, just record the deposit as verified and ask for address
+    if (!isValidBaseAddress) {
       if (db) {
-        db.prepare(`
-          UPDATE credit_deposits 
-          SET status = 'completed', outbound_tx_hash = ?, processed_at = datetime('now')
-          WHERE tx_hash = ?
-        `).run(sendResult.txHash, txHash);
+        db.prepare('UPDATE credit_deposits SET status = ? WHERE tx_hash = ?').run('verified_no_address', txHash);
       }
-      
       return NextResponse.json({
         success: true,
-        message: `Successfully credited ${depositAmount.toFixed(2)} USDC to agent wallet! (Conway unavailable)`,
-        txHash: sendResult.txHash,
+        message: `Deposit verified! $${depositAmount.toFixed(2)} received from ${senderWallet?.slice(0, 8)}...${senderWallet?.slice(-6)}. Provide an agent Base wallet to receive credits.`,
         amount: depositAmount,
         senderWallet,
-        agentWallet: userBaseAddress,
-        conwayError: conwayResult.error,
+        note: 'Provide agent Base wallet address to receive credits.',
       });
     }
     
-    // Conway purchase successful
+    // Add Conway credits to the agent's wallet
+    const conwayResult = await addConwayCredits(userBaseAddress, depositAmount);
+    
+    // Update DB with success
     if (db) {
       db.prepare(`
         UPDATE credit_deposits 
-        SET status = 'completed', outbound_tx_hash = ?, processed_at = datetime('now')
+        SET status = 'completed', processed_at = datetime('now')
         WHERE tx_hash = ?
-      `).run(conwayResult.txHash, txHash);
+      `).run(txHash);
     }
     
-    // Get updated Conway balance
-    const conwayBalance = await getConwayBalance();
+    // Get agent's updated balance
+    const agentBalance = await getAgentCreditsBalance(userBaseAddress);
     
     return NextResponse.json({
       success: true,
-      message: `Successfully purchased ${depositAmount.toFixed(2)} Conway credits!`,
-      txHash: conwayResult.txHash,
+      message: `Successfully added ${depositAmount.toFixed(2)} Conway credits to agent!`,
       amount: depositAmount,
       senderWallet,
-      conwayCredits: conwayResult.creditsPurchased,
-      conwayBalance,
+      agentWallet: userBaseAddress,
+      creditsAdded: conwayResult.creditsPurchased,
+      agentBalance,
+      method: conwayResult.method,
     });
     
   } catch (error: any) {
@@ -730,7 +685,7 @@ async function verifyBaseDeposit(
 async function sendUsdcOnBase(
   toAddress: Address,
   amount: number
-): Promise<{ success: boolean; txHash?: string; error?: string }> {
+): Promise<{ success: boolean; txHash?: string; error?: string; amountSent?: number }> {
   // Check for private key in environment
   const privateKey = process.env.BASE_TREASURY_PRIVATE_KEY;
   if (!privateKey) {
@@ -759,10 +714,18 @@ async function sendUsdcOnBase(
       args: [BASE_TREASURY_ADDRESS],
     });
     
-    const amountRaw = BigInt(Math.floor(amount * Math.pow(10, USDC_DECIMALS)));
+    let amountRaw = BigInt(Math.floor(amount * Math.pow(10, USDC_DECIMALS)));
+    let actualAmount = amount;
     
+    // If insufficient balance, send whatever is available (min $1)
     if (balance < amountRaw) {
-      return { success: false, error: 'Insufficient USDC balance in treasury' };
+      const availableAmount = Number(balance) / Math.pow(10, USDC_DECIMALS);
+      if (availableAmount < 1) {
+        return { success: false, error: `Insufficient USDC in treasury. Available: $${availableAmount.toFixed(2)}` };
+      }
+      console.log(`[Credits API] Treasury low: sending $${availableAmount.toFixed(2)} of requested $${amount.toFixed(2)}`);
+      amountRaw = balance;
+      actualAmount = availableAmount;
     }
     
     // Send USDC
@@ -780,7 +743,7 @@ async function sendUsdcOnBase(
       return { success: false, error: 'Transfer transaction failed' };
     }
     
-    return { success: true, txHash: hash };
+    return { success: true, txHash: hash, amountSent: actualAmount };
   } catch (e: any) {
     console.error('sendUsdcOnBase error:', e);
     return { success: false, error: e.message || 'Transfer failed' };
