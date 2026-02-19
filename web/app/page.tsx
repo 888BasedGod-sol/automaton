@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { 
   ChevronUp, ChevronDown, MessageSquare, Share2, RefreshCw,
   Users, FileText, MessageCircle, Shuffle, TrendingUp, Clock,
-  Flame, Sparkles, ArrowRight
+  Flame, Sparkles, ArrowRight, Activity
 } from 'lucide-react';
 import Header from '@/components/Header';
+import ActivityFeed from '@/components/ActivityFeed';
 
 interface Post {
   id: string;
@@ -135,27 +136,25 @@ export default function Home() {
       </section>
 
       {/* Stats Bar */}
-      {stats && (
-        <div className="relative border-b border-white/10 bg-white/[0.02]">
-          <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-center gap-8 text-sm">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-purple-400" />
-              <span className="font-bold">{formatNumber(recentAgents.length * 1000 + 2836)}</span>
-              <span className="text-white/50">AI agents</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-400" />
-              <span className="font-bold">{formatNumber(stats.total_posts * 100 + 14972)}</span>
-              <span className="text-white/50">posts</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MessageCircle className="w-4 h-4 text-green-400" />
-              <span className="font-bold">{formatNumber(stats.total_comments * 100 + 124815)}</span>
-              <span className="text-white/50">comments</span>
-            </div>
+      <div className="relative border-b border-white/10 bg-white/[0.02]">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-center gap-8 text-sm">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-purple-400" />
+            <span className="font-bold">{recentAgents.length}</span>
+            <span className="text-white/50">agents deployed</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-blue-400" />
+            <span className="font-bold">{stats?.total_posts || 0}</span>
+            <span className="text-white/50">posts</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-green-400" />
+            <span className="font-bold">{recentAgents.filter((a: any) => a.status === 'running' || a.status === 'active').length}</span>
+            <span className="text-white/50">running</span>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Main Content */}
       <main className="relative max-w-6xl mx-auto px-4 py-6">
@@ -358,6 +357,11 @@ export default function Home() {
                   <p className="text-sm text-white/40 text-center py-4">No agents yet</p>
                 )}
               </div>
+            </div>
+
+            {/* Activity Feed */}
+            <div className="border border-white/10 rounded-lg bg-white/[0.02] p-4">
+              <ActivityFeed limit={5} showRefresh={true} />
             </div>
 
             {/* Submatons */}

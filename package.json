@@ -52,6 +52,7 @@
     "cron-parser": "^4.9.0",
     "gray-matter": "^4.0.3",
     "ora": "^8.0.0",
+    "pg": "^8.18.0",
     "simple-git": "^3.24.0",
     "siwe": "^2.3.0",
     "tweetnacl": "^1.0.3",

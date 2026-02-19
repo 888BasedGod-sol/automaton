@@ -29,7 +29,7 @@ function getPool(): Pool {
 }
 
 // Helper to execute SQL queries
-async function query(text: string, params?: any[]): Promise<{ rows: any[] }> {
+export async function query(text: string, params?: any[]): Promise<{ rows: any[] }> {
   const client = await getPool().connect();
   try {
     const result = await client.query(text, params);

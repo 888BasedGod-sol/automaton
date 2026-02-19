@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ArrowLeft, Copy, ExternalLink, Activity, Coins, Clock, Shield,
-  Zap, AlertTriangle, Scale, CheckCircle, Loader2, RefreshCw, User
+  Zap, AlertTriangle, Scale, CheckCircle, Loader2, RefreshCw, User,
+  Play, Square, RotateCw, Send, Rocket, Terminal
 } from 'lucide-react';
 import Header from '@/components/Header';
 
@@ -52,6 +53,8 @@ export default function AgentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (agentId) {
@@ -93,6 +96,31 @@ export default function AgentDetailPage() {
     if (days > 0) return `${days}d ${hours}h`;
     const mins = Math.floor((seconds % 3600) / 60);
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  const handleAction = async (action: 'start' | 'stop' | 'restart' | 'deploy') => {
+    setActionLoading(action);
+    setActionMessage(null);
+    try {
+      const res = await fetch('/api/agents/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, action }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionMessage(data.message);
+        // Refresh agent data
+        fetchAgent();
+      } else {
+        setActionMessage(`Error: ${data.error}`);
+      }
+    } catch (e) {
+      setActionMessage('Action failed');
+    } finally {
+      setActionLoading(null);
+      setTimeout(() => setActionMessage(null), 3000);
+    }
   };
 
   if (loading) {
@@ -202,6 +230,82 @@ export default function AgentDetailPage() {
             </div>
             <p className="text-lg font-semibold">{agent.stats?.interactions || 0}</p>
           </div>
+        </div>
+
+        {/* Actions Panel */}
+        <div className="mb-8 p-4 bg-white/5 border border-white/10 rounded-lg">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Terminal className="w-5 h-5 text-purple-400" />
+            Agent Actions
+          </h2>
+          
+          {actionMessage && (
+            <div className={`mb-4 p-3 rounded-lg text-sm ${
+              actionMessage.startsWith('Error') 
+                ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+                : 'bg-green-500/10 text-green-400 border border-green-500/20'
+            }`}>
+              {actionMessage}
+            </div>
+          )}
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button
+              onClick={() => handleAction('start')}
+              disabled={actionLoading !== null || agent.status === 'running'}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg hover:bg-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {actionLoading === 'start' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4" />
+              )}
+              Start
+            </button>
+            
+            <button
+              onClick={() => handleAction('stop')}
+              disabled={actionLoading !== null || agent.status === 'suspended'}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {actionLoading === 'stop' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+              Stop
+            </button>
+            
+            <button
+              onClick={() => handleAction('restart')}
+              disabled={actionLoading !== null}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 rounded-lg hover:bg-yellow-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {actionLoading === 'restart' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RotateCw className="w-4 h-4" />
+              )}
+              Restart
+            </button>
+            
+            <button
+              onClick={() => handleAction('deploy')}
+              disabled={actionLoading !== null}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-500/10 border border-purple-500/30 text-purple-400 rounded-lg hover:bg-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {actionLoading === 'deploy' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Rocket className="w-4 h-4" />
+              )}
+              Deploy
+            </button>
+          </div>
+          
+          <p className="mt-3 text-xs text-white/40">
+            Requires Conway API key for full functionality. Demo mode simulates actions.
+          </p>
         </div>
 
         {/* Wallet Addresses */}
