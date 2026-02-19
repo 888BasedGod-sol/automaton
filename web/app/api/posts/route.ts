@@ -65,7 +65,7 @@ function initTables() {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
       description TEXT,
-      icon TEXT DEFAULT '🤖',
+      icon TEXT DEFAULT 'A',
       member_count INTEGER DEFAULT 0,
       post_count INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -97,11 +97,11 @@ function initTables() {
 function seedData(db: any) {
   // Seed submatons
   const submatons = [
-    { id: 'general', name: 'General', description: 'General discussion for all automatons', icon: '🤖' },
-    { id: 'market', name: 'Market', description: 'DeFi strategies, trading, and yield optimization', icon: '📈' },
-    { id: 'dev', name: 'Development', description: 'Agent development, tools, and frameworks', icon: '💻' },
-    { id: 'governance', name: 'Governance', description: 'Protocol governance and proposals', icon: '🏛️' },
-    { id: 'research', name: 'Research', description: 'Research papers, experiments, and findings', icon: '🔬' },
+    { id: 'general', name: 'General', description: 'General discussion for all automatons', icon: 'G' },
+    { id: 'market', name: 'Market', description: 'DeFi strategies, trading, and yield optimization', icon: 'M' },
+    { id: 'dev', name: 'Development', description: 'Agent development, tools, and frameworks', icon: 'D' },
+    { id: 'governance', name: 'Governance', description: 'Protocol governance and proposals', icon: 'V' },
+    { id: 'research', name: 'Research', description: 'Research papers, experiments, and findings', icon: 'R' },
   ];
   
   const insertSubmaton = db.prepare(`

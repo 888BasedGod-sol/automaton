@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, getCachedStmt } from '@/lib/db-singleton';
 import { getMemoryAgents, DEMO_AGENTS } from '@/lib/memory-store';
+import { getAllAgents as getPostgresAgents, isPostgresConfigured, initDatabase } from '@/lib/postgres';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -43,10 +44,33 @@ interface EnrichedAgent {
 function enrichAgent(agent: any): any {
   const isDeployed = !!agent.erc8004_id;
   
+  // Parse skills only if it's a string (not already an array from JSONB)
+  let parsedSkills = agent.skills;
+  if (typeof parsedSkills === 'string') {
+    try {
+      parsedSkills = JSON.parse(parsedSkills);
+    } catch {
+      parsedSkills = [];
+    }
+  }
+  if (!Array.isArray(parsedSkills)) {
+    parsedSkills = [];
+  }
+
+  // Parse agent_card only if it's a string
+  let parsedAgentCard = agent.agent_card;
+  if (typeof parsedAgentCard === 'string') {
+    try {
+      parsedAgentCard = JSON.parse(parsedAgentCard);
+    } catch {
+      parsedAgentCard = null;
+    }
+  }
+  
   return {
     ...agent,
-    skills: JSON.parse(agent.skills || '[]'),
-    agent_card: agent.agent_card ? JSON.parse(agent.agent_card) : null,
+    skills: parsedSkills,
+    agent_card: parsedAgentCard,
     deployment: {
       onChain: isDeployed,
       erc8004Id: agent.erc8004_id || null,
@@ -65,6 +89,48 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const refresh = searchParams.get('refresh') === 'true';
     const deployedOnly = searchParams.get('deployed') === 'true';
+
+    // Try Vercel Postgres first (persistent storage)
+    if (isPostgresConfigured()) {
+      await initDatabase(); // Ensure tables exist
+      const dbAgents = await getPostgresAgents();
+      
+      // If we have real agents, return them
+      if (dbAgents.length > 0) {
+        const allAgents = dbAgents.map(a => enrichAgent(a));
+        
+        let result = allAgents;
+        if (deployedOnly) {
+          result = allAgents.filter(a => a.deployment?.onChain);
+        }
+
+        return NextResponse.json({
+          success: true,
+          agents: result,
+          total: result.length,
+          storage: 'vercel-postgres',
+        }, {
+          headers: { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' },
+        });
+      }
+      
+      // Database is empty - show demo agents
+      const allAgents = [...DEMO_AGENTS].map(enrichAgent);
+      let result = allAgents;
+      if (deployedOnly) {
+        result = allAgents.filter(a => a.deployment?.onChain);
+      }
+      
+      return NextResponse.json({
+        success: true,
+        agents: result,
+        total: result.length,
+        storage: 'vercel-postgres',
+        note: 'Showing demo agents - deploy your own!',
+      }, {
+        headers: { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' },
+      });
+    }
 
     // In serverless mode, use memory store + demo agents
     if (IS_SERVERLESS) {
@@ -139,7 +205,7 @@ export async function GET(request: NextRequest) {
     }, {
       headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching agents:', error);
     // Return demo agents on error
     const allAgents = [...getMemoryAgents(), ...DEMO_AGENTS].map(enrichAgent);
@@ -148,6 +214,7 @@ export async function GET(request: NextRequest) {
       agents: allAgents,
       total: allAgents.length,
       fallback: true,
+      error: error?.message || String(error),
     });
   }
 }

@@ -1,10 +1,19 @@
 'use client';
 
-import { useState } from 'react';
-import { CheckCircle, Copy, ExternalLink, ArrowRight, ArrowLeft, Loader2, Zap, CreditCard, Coins } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CheckCircle, Copy, ExternalLink, ArrowRight, ArrowLeft, Loader2, Zap, CreditCard, Coins, Wallet } from 'lucide-react';
 import Link from 'next/link';
+import { useWallet } from '@solana/wallet-adapter-react';
+import dynamic from 'next/dynamic';
+
+// Dynamically import wallet button to avoid SSR issues
+const WalletMultiButton = dynamic(
+  async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
+  { ssr: false, loading: () => <div className="h-9 w-32 bg-purple-600/50 rounded-lg animate-pulse" /> }
+);
 
 export default function Create() {
+  const { publicKey, connected, connecting } = useWallet();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -19,6 +28,11 @@ export default function Create() {
   });
 
   const generateWallets = async () => {
+    if (!publicKey) {
+      alert('Please connect your wallet first');
+      return;
+    }
+    
     setLoading(true);
     
     try {
@@ -29,6 +43,7 @@ export default function Create() {
         body: JSON.stringify({
           name: config.name,
           genesisPrompt: config.genesisPrompt,
+          ownerWallet: publicKey.toBase58(),
         }),
       });
       
@@ -44,7 +59,7 @@ export default function Create() {
         solanaAddress: data.solanaAddress,
       }));
       
-      setStep(3);
+      setStep(4);
     } catch (e) {
       console.error(e);
       // Fallback to mock addresses if API fails
@@ -58,7 +73,7 @@ export default function Create() {
         evmAddress: '0x' + Array.from({ length: 40 }, () => evmChars[Math.floor(Math.random() * 16)]).join(''),
         solanaAddress: Array.from({ length: 44 }, () => solChars[Math.floor(Math.random() * solChars.length)]).join(''),
       }));
-      setStep(3);
+      setStep(4);
     } finally {
       setLoading(false);
     }
@@ -88,7 +103,7 @@ export default function Create() {
       <main className="relative max-w-2xl mx-auto px-6 py-12">
         {/* Progress */}
         <div className="flex items-center justify-center gap-2 mb-16">
-          {['Configure', 'Generate', 'Save', 'Done', 'Fund'].map((label, i) => (
+          {['Connect', 'Configure', 'Generate', 'Save', 'Done', 'Fund'].map((label, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border transition-colors ${
                 step > i + 1 ? 'bg-white text-black border-white' :
@@ -97,18 +112,103 @@ export default function Create() {
               }`}>
                 {step > i + 1 ? <CheckCircle className="w-4 h-4" /> : i + 1}
               </div>
-              {i < 4 && <div className={`w-8 h-px ${step > i + 1 ? 'bg-white' : 'bg-white/20'}`} />}
+              {i < 5 && <div className={`w-8 h-px ${step > i + 1 ? 'bg-white' : 'bg-white/20'}`} />}
             </div>
           ))}
         </div>
 
-        {/* Step 1: Configure */}
+        {/* Step 1: Connect Wallet */}
         {step === 1 && (
+          <div className="space-y-8">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-semibold mb-2">Connect Your Wallet</h2>
+              <p className="text-white/50">Link your Solana wallet to manage your agent</p>
+            </div>
+
+            <div className="max-w-md mx-auto space-y-6">
+              {/* Why connect wallet */}
+              <div className="p-5 bg-white/5 rounded-lg border border-white/10 space-y-4">
+                <h3 className="font-medium text-lg">Why connect a wallet?</h3>
+                <ul className="space-y-3 text-sm text-white/70">
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Monitor your agent's status and credits</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Manage funds and top up credits</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Access your dashboard with all your agents</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Prove ownership of your agents</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Wallet Connection */}
+              <div className={`p-5 rounded-lg border ${connected ? 'border-green-500/30 bg-green-500/10' : 'border-purple-500/30 bg-purple-500/10'}`}>
+                <div className="flex flex-col items-center gap-4">
+                  <Wallet className={`w-10 h-10 ${connected ? 'text-green-400' : 'text-purple-400'}`} />
+                  {connected && publicKey ? (
+                    <>
+                      <div className="text-center">
+                        <p className="font-medium text-green-400 mb-1">Wallet Connected</p>
+                        <p className="text-sm text-white/50 font-mono">
+                          {publicKey.toBase58().slice(0, 12)}...{publicKey.toBase58().slice(-8)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setStep(2)}
+                        className="w-full py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
+                      >
+                        Continue <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-white/50 text-sm text-center">
+                        Connect your Solana wallet to continue
+                      </p>
+                      <WalletMultiButton style={{
+                        backgroundColor: 'rgba(147, 51, 234, 1)',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        height: '44px',
+                        padding: '0 24px',
+                        width: '100%',
+                        justifyContent: 'center',
+                      }} />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-white/30 text-center">
+                We support Phantom, Solflare, and other Solana wallets
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Configure */}
+        {step === 2 && (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-semibold mb-2">Configure Genesis</h2>
               <p className="text-white/50">Define your automaton's identity</p>
             </div>
+
+            {/* Connected wallet indicator */}
+            {connected && publicKey && (
+              <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5 flex items-center gap-3">
+                <Wallet className="w-4 h-4 text-green-400" />
+                <span className="text-sm text-white/70">Connected: <span className="font-mono text-green-400">{publicKey.toBase58().slice(0, 8)}...{publicKey.toBase58().slice(-4)}</span></span>
+              </div>
+            )}
             
             <div>
               <label className="block text-sm text-white/50 mb-2">Name</label>
@@ -133,18 +233,26 @@ export default function Create() {
               <p className="mt-2 text-xs text-white/30">This prompt defines who your automaton is</p>
             </div>
 
-            <button
-              onClick={() => setStep(2)}
-              disabled={!config.name || !config.genesisPrompt}
-              className="w-full py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-30 flex items-center justify-center gap-2"
-            >
-              Continue <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep(1)}
+                className="px-6 py-3 bg-white/10 text-white rounded-lg font-medium hover:bg-white/20 transition-colors flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <button
+                onClick={() => setStep(3)}
+                disabled={!config.name || !config.genesisPrompt}
+                className="flex-1 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-30 flex items-center justify-center gap-2"
+              >
+                Continue <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Step 2: Generate */}
-        {step === 2 && (
+        {/* Step 3: Generate */}
+        {step === 3 && (
           <div className="text-center space-y-8">
             <div>
               <h2 className="text-2xl font-semibold mb-2">Generate Wallets</h2>
@@ -153,12 +261,12 @@ export default function Create() {
             
             <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
               <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-left">
-                <div className="text-blue-400 mb-1">⟠</div>
+                <div className="text-blue-400 mb-1 text-lg font-bold">ETH</div>
                 <div className="font-medium text-sm">EVM</div>
                 <div className="text-xs text-white/40">Base / Ethereum</div>
               </div>
               <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-left">
-                <div className="text-purple-400 mb-1">◎</div>
+                <div className="text-purple-400 mb-1 text-lg font-bold">SOL</div>
                 <div className="font-medium text-sm">Solana</div>
                 <div className="text-xs text-white/40">USDC deposits</div>
               </div>
@@ -175,8 +283,8 @@ export default function Create() {
           </div>
         )}
 
-        {/* Step 3: Save Wallets */}
-        {step === 3 && (
+        {/* Step 4: Save Wallets */}
+        {step === 4 && (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-semibold mb-2">Save Your Agent&apos;s Wallets</h2>
@@ -188,7 +296,7 @@ export default function Create() {
               {/* Base/EVM Wallet */}
               <div className="p-4 bg-white/5 rounded-lg border border-white/10">
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="text-blue-400 text-xl">⟠</span>
+                  <span className="text-blue-400 text-xl font-bold">ETH</span>
                   <div>
                     <div className="font-medium">Base / EVM Wallet</div>
                     <div className="text-xs text-white/40">For Base, Ethereum, and other EVM chains</div>
@@ -210,7 +318,7 @@ export default function Create() {
               {/* Solana Wallet */}
               <div className="p-4 bg-white/5 rounded-lg border border-white/10">
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="text-purple-400 text-xl">◎</span>
+                  <span className="text-purple-400 text-xl font-bold">SOL</span>
                   <div>
                     <div className="font-medium">Solana Wallet</div>
                     <div className="text-xs text-white/40">For SOL and SPL tokens (USDC)</div>
@@ -237,7 +345,7 @@ export default function Create() {
             </div>
 
             <button
-              onClick={() => setStep(4)}
+              onClick={() => setStep(5)}
               className="w-full py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
             >
               Continue <ArrowRight className="w-4 h-4" />
@@ -245,8 +353,8 @@ export default function Create() {
           </div>
         )}
 
-        {/* Step 4: Done */}
-        {step === 4 && (
+        {/* Step 5: Done */}
+        {step === 5 && (
           <div className="text-center space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400">
               <CheckCircle className="w-4 h-4" />
@@ -280,6 +388,18 @@ export default function Create() {
             </div>
 
             <div className="flex gap-3 justify-center flex-wrap">
+              <Link
+                href={`/agents/${agentId}`}
+                className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors flex items-center gap-2"
+              >
+                View Agent <ArrowRight className="w-3 h-3" />
+              </Link>
+              <button
+                onClick={() => setStep(6)}
+                className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <CreditCard className="w-3 h-3" /> Buy Credits
+              </button>
               <a
                 href={`https://basescan.org/address/${config.evmAddress}`}
                 target="_blank"
@@ -294,21 +414,12 @@ export default function Create() {
               >
                 Solscan <ExternalLink className="w-3 h-3" />
               </a>
-              <button
-                onClick={() => setStep(5)}
-                className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-              >
-                <CreditCard className="w-3 h-3" /> Buy Credits
-              </button>
-              <Link href="/agents" className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors">
-                View All Agents
-              </Link>
             </div>
           </div>
         )}
 
-        {/* Step 5: Fund */}
-        {step === 5 && (
+        {/* Step 6: Fund */}
+        {step === 6 && (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-semibold mb-2">Fund Your Agent</h2>
@@ -333,7 +444,7 @@ export default function Create() {
                 >
                   <div className="text-lg font-semibold">{amount.label}</div>
                   <div className="text-xs text-white/50">{amount.description}</div>
-                  {amount.recommended && <div className="text-xs text-purple-400 mt-1">★ Popular</div>}
+                  {amount.recommended && <div className="text-xs text-purple-400 mt-1">Popular</div>}
                 </div>
               ))}
             </div>

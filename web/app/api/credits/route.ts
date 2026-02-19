@@ -5,6 +5,14 @@ import { base } from 'viem/chains';
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { loadTreasuryConfig } from '@/lib/treasury';
 import { getDb } from '@/lib/db-singleton';
+import { 
+  isPostgresConfigured, 
+  isDepositClaimed, 
+  recordDeposit, 
+  updateAgentCredits,
+  getAgentByWallet,
+  initDatabase
+} from '@/lib/postgres';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -95,80 +103,83 @@ function getConwayApiKey(): string | null {
 }
 
 /**
- * Add Conway credits to an agent's account
+ * Transfer Conway credits to an agent's wallet
  * 
  * Called after verifying a deposit to our treasury.
- * Tries Conway API first, then falls back to local tracking.
+ * Uses Conway's /v1/credits/transfer endpoint to send credits from our account.
  */
 async function addConwayCredits(
   agentAddress: string,
   amountUsdc: number
-): Promise<{ success: boolean; creditsPurchased?: number; method?: string; error?: string }> {
+): Promise<{ success: boolean; creditsPurchased?: number; method?: string; error?: string; transferId?: string }> {
   const apiKey = getConwayApiKey();
   const amountCents = Math.floor(amountUsdc * 100);
   
-  // Method 1: Try Conway's add-credits API (if available)
-  if (apiKey) {
+  if (!apiKey) {
+    // Fall back to local tracking if no API key
+    const currentCredits = agentCredits.get(agentAddress.toLowerCase()) || 0;
+    agentCredits.set(agentAddress.toLowerCase(), currentCredits + amountCents);
+    console.log(`[Credits API] Added ${amountUsdc} credits locally (no API key)`);
+    return {
+      success: true,
+      creditsPurchased: amountUsdc,
+      method: 'local_tracking',
+    };
+  }
+  
+  // Try Conway's transfer endpoint (transfers from our account to agent)
+  const paths = ['/v1/credits/transfer', '/v1/credits/transfers'];
+  
+  for (const path of paths) {
     try {
-      const addRes = await fetch(`${CONWAY_API_URL}/v1/credits/add`, {
+      const res = await fetch(`${CONWAY_API_URL}${path}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': apiKey,
         },
         body: JSON.stringify({
-          wallet_address: agentAddress,
+          to_address: agentAddress,
           amount_cents: amountCents,
-          source: 'automaton_deposit',
+          note: `Automaton deposit - ${amountUsdc} USDC`,
         }),
       });
       
-      if (addRes.ok) {
-        const data = await addRes.json();
-        console.log(`[Credits API] Added ${amountUsdc} Conway credits to ${agentAddress} via API`);
+      if (res.ok) {
+        const data = await res.json();
+        console.log(`[Credits API] Transferred ${amountUsdc} credits to ${agentAddress} via ${path}`);
         return {
           success: true,
           creditsPurchased: amountUsdc,
-          method: 'conway_api',
+          method: 'conway_transfer',
+          transferId: data.transfer_id || data.id,
         };
       }
       
-      // Try alternate endpoint format
-      const altRes = await fetch(`${CONWAY_API_URL}/v1/wallets/${agentAddress}/credits`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({
-          amount_cents: amountCents,
-          source: 'automaton_deposit',
-        }),
-      });
-      
-      if (altRes.ok) {
-        console.log(`[Credits API] Added ${amountUsdc} Conway credits to ${agentAddress} via wallet endpoint`);
-        return {
-          success: true,
-          creditsPurchased: amountUsdc,
-          method: 'conway_wallet_api',
-        };
+      // If 404, try next endpoint
+      if (res.status === 404) {
+        console.log(`[Credits API] ${path} not found, trying next...`);
+        continue;
       }
+      
+      // Other error - log and continue
+      const errorText = await res.text();
+      console.error(`[Credits API] ${path} failed: ${res.status} - ${errorText}`);
     } catch (e) {
-      console.log('[Credits API] Conway API not available, using local tracking');
+      console.error(`[Credits API] ${path} error:`, e);
     }
   }
   
-  // Method 2: Local credit tracking (always succeeds after verified deposit)
+  // All Conway endpoints failed - fall back to local tracking
+  console.log('[Credits API] Conway transfer failed, using local tracking');
   const currentCredits = agentCredits.get(agentAddress.toLowerCase()) || 0;
   agentCredits.set(agentAddress.toLowerCase(), currentCredits + amountCents);
-  
-  console.log(`[Credits API] Added ${amountUsdc} credits locally to ${agentAddress} (total: ${(currentCredits + amountCents) / 100})`);
   
   return {
     success: true,
     creditsPurchased: amountUsdc,
     method: 'local_tracking',
+    error: 'Conway transfer unavailable - credits tracked locally',
   };
 }
 
@@ -358,15 +369,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Valid Base wallet address required for Base deposits' }, { status: 400 });
     }
     
-    // Check if already processed
-    const db = getDb();
-    if (db) {
-      const existing = db.prepare('SELECT * FROM credit_deposits WHERE tx_hash = ?').get(txHash);
-      if (existing) {
+    // Check if already processed (try Postgres first, then local DB)
+    if (isPostgresConfigured()) {
+      await initDatabase();
+      const alreadyClaimed = await isDepositClaimed(txHash);
+      if (alreadyClaimed) {
         return NextResponse.json({
           success: false,
           error: 'This transaction has already been claimed',
         }, { status: 400 });
+      }
+    } else {
+      const db = getDb();
+      if (db) {
+        const existing = db.prepare('SELECT * FROM credit_deposits WHERE tx_hash = ?').get(txHash);
+        if (existing) {
+          return NextResponse.json({
+            success: false,
+            error: 'This transaction has already been claimed',
+          }, { status: 400 });
+        }
       }
     }
     
@@ -436,19 +458,30 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Record the deposit (skip if db not available)
-    if (db) {
-      db.prepare(`
-        INSERT INTO credit_deposits (tx_hash, chain, asset, amount_raw, amount_credits, user_base_address, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'verified')
-      `).run(txHash, verifiedChain, asset, depositAmount.toString(), depositAmount, userBaseAddress);
+    // Record the deposit (try Postgres first, then local DB)
+    if (isPostgresConfigured()) {
+      await recordDeposit({
+        tx_hash: txHash,
+        chain: verifiedChain as 'solana' | 'base',
+        asset: verifiedAsset as 'sol' | 'usdc',
+        amount_raw: depositAmount.toString(),
+        amount_credits: depositAmount,
+        sender_wallet: senderWallet || 'unknown',
+        agent_wallet: userBaseAddress || '',
+        status: 'verified',
+      });
+    } else {
+      const db = getDb();
+      if (db) {
+        db.prepare(`
+          INSERT INTO credit_deposits (tx_hash, chain, asset, amount_raw, amount_credits, user_base_address, status)
+          VALUES (?, ?, ?, ?, ?, ?, 'verified')
+        `).run(txHash, verifiedChain, verifiedAsset, depositAmount.toString(), depositAmount, userBaseAddress);
+      }
     }
     
     // If no valid Base address, just record the deposit as verified and ask for address
     if (!isValidBaseAddress) {
-      if (db) {
-        db.prepare('UPDATE credit_deposits SET status = ? WHERE tx_hash = ?').run('verified_no_address', txHash);
-      }
       return NextResponse.json({
         success: true,
         message: `Deposit verified! $${depositAmount.toFixed(2)} received from ${senderWallet?.slice(0, 8)}...${senderWallet?.slice(-6)}. Provide an agent Base wallet to receive credits.`,
@@ -462,6 +495,7 @@ export async function POST(request: NextRequest) {
     const conwayResult = await addConwayCredits(userBaseAddress, depositAmount);
     
     // Update DB with success
+    const db = getDb();
     if (db) {
       db.prepare(`
         UPDATE credit_deposits 

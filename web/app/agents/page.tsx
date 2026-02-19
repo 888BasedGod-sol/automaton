@@ -7,6 +7,7 @@ import {
   Scale, ExternalLink, Clock, Activity, Sparkles, ChevronDown, Globe,
   CheckCircle, Shield
 } from 'lucide-react';
+import Header from '@/components/Header';
 
 interface Agent {
   id: string;
@@ -185,27 +186,7 @@ export default function AgentsPage() {
     <div className="min-h-screen bg-black text-white">
       <div className="fixed inset-0 bg-gradient-to-b from-purple-950/20 via-black to-black pointer-events-none" />
 
-      {/* Header */}
-      <header className="relative border-b border-white/10 backdrop-blur-sm sticky top-0 z-20 bg-black/90">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold tracking-tight flex items-center gap-1">
-            AUTOMATON<span className="text-purple-400">CLOUD</span>
-          </Link>
-          
-          <nav className="flex items-center gap-6 text-sm text-white/60">
-            <Link href="/" className="hover:text-white transition-colors flex items-center gap-1">
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Link>
-            <Link href="/constitution" className="hover:text-white transition-colors text-red-400/80 hover:text-red-400">
-              Constitution
-            </Link>
-            <Link href="/create" className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors">
-              Deploy Agent
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* Content */}
       <main className="relative max-w-6xl mx-auto px-4 py-8">

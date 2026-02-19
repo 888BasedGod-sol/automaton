@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentPublic, getAgent, updateAgentBalances, markAgentFunded, updateAgentStatus } from '@/lib/db';
 import { getAgentBalances, hasMinimumFunding } from '@/lib/balances';
+import { isPostgresConfigured, getAgentById, getAgentByWallet, initDatabase } from '@/lib/postgres';
 import path from 'path';
 import fs from 'fs';
 
 // Check if we're in serverless environment
 const IS_SERVERLESS = process.env.VERCEL === '1' || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 
-// Lazy load better-sqlite3
-let Database: typeof import('better-sqlite3') | null = null;
+// Lazy load better-sqlite3 (type as any to avoid build errors in serverless)
+let Database: any = null;
 if (!IS_SERVERLESS) {
   try {
     Database = require('better-sqlite3');
@@ -60,14 +61,30 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const agent = getAgentPublic(params.id);
+    let agent: any = null;
+    
+    // Try Vercel Postgres first
+    if (isPostgresConfigured()) {
+      await initDatabase(); // Ensure tables exist
+      // Check if id looks like a wallet address
+      if (params.id.startsWith('0x') || params.id.length > 40) {
+        agent = await getAgentByWallet(params.id);
+      } else {
+        agent = await getAgentById(params.id);
+      }
+    }
+    
+    // Fall back to local DB
+    if (!agent) {
+      agent = getAgentPublic(params.id);
+    }
 
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
 
     // Enrich with social/activity data
-    const creditsBalance = getAgentCredits(params.id);
+    const creditsBalance = getAgentCredits(params.id) || agent.credits_balance || 0;
     const stats = getAgentStats(params.id);
     const recentActivity = getAgentActivity(params.id);
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, parseAbi, type Address } from 'viem';
 import { base } from 'viem/chains';
-import { getDb } from '@/lib/db-singleton';
+import { isPostgresConfigured, initDatabase, getAgentById, getAgentByWallet, getAgentByErc8004Id } from '@/lib/postgres';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,7 +73,6 @@ async function verifyAgent(params: {
   evmAddress?: string | null;
   erc8004Id?: string | null;
 }): Promise<VerificationResult> {
-  const db = getDb();
   const publicClient = createPublicClient({
     chain: base,
     transport: http('https://mainnet.base.org'),
@@ -82,13 +81,25 @@ async function verifyAgent(params: {
   let dbAgent: any = null;
   let onChainData: any = null;
 
-  // Check database first
+  // Check database first (Postgres)
+  if (!isPostgresConfigured()) {
+    return {
+      verified: false,
+      agentId: null,
+      onChain: { exists: false, owner: null, metadataUrl: null, isAutomatonDeployed: false },
+      database: { exists: false, erc8004Id: null, status: null },
+      message: 'Database not configured',
+    };
+  }
+
+  await initDatabase();
+  
   if (params.agentId) {
-    dbAgent = db.prepare('SELECT * FROM agents WHERE id = ?').get(params.agentId);
+    dbAgent = await getAgentById(params.agentId);
   } else if (params.evmAddress) {
-    dbAgent = db.prepare('SELECT * FROM agents WHERE evm_address = ?').get(params.evmAddress);
+    dbAgent = await getAgentByWallet(params.evmAddress);
   } else if (params.erc8004Id) {
-    dbAgent = db.prepare('SELECT * FROM agents WHERE erc8004_id = ?').get(params.erc8004Id);
+    dbAgent = await getAgentByErc8004Id(params.erc8004Id);
   }
 
   // Check on-chain if we have an ERC-8004 ID

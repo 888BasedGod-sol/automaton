@@ -60,3 +60,43 @@ body {
 code, pre {
   font-family: 'JetBrains Mono', monospace;
 }
+
+/* Solana Wallet Adapter Overrides */
+.wallet-adapter-button {
+  background-color: rgb(147, 51, 234) !important;
+  border-radius: 8px !important;
+  height: 36px !important;
+  padding: 0 16px !important;
+  font-size: 14px !important;
+}
+
+.wallet-adapter-button:hover {
+  background-color: rgb(126, 34, 206) !important;
+}
+
+.wallet-adapter-button-trigger {
+  background-color: rgb(147, 51, 234) !important;
+}
+
+.wallet-adapter-modal-wrapper {
+  background-color: rgba(0, 0, 0, 0.9) !important;
+}
+
+.wallet-adapter-modal-container {
+  background-color: #1a1a1a !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+}
+
+.wallet-adapter-modal-title {
+  color: white !important;
+}
+
+.wallet-adapter-modal-list li {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+}
+
+.wallet-adapter-modal-list li:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}

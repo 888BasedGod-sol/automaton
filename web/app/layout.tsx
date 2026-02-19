@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
+import Providers from '@/components/Providers'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -53,7 +54,9 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://marketplace.olas.network" />
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans bg-black text-white min-h-screen antialiased`}>
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   )

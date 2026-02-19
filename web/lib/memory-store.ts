@@ -6,6 +6,7 @@ export interface MemoryAgent {
   name: string;
   genesis_prompt: string;
   creator_wallet: string;
+  owner_wallet?: string;
   evm_address: string;
   solana_address: string;
   status: string;
