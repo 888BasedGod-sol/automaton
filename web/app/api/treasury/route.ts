@@ -5,7 +5,7 @@ import {
   fundAgentFromTreasury,
   getTreasuryPublicInfo 
 } from '@/lib/treasury';
-import { getDb, getCachedStmt } from '@/lib/db-singleton';
+import { getAgentById, updateAgentFunding } from '@/lib/postgres';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,9 +81,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Get agent's Solana address
-    const db = getDb();
-    const agent = db.prepare('SELECT id, name, solana_address, status FROM agents WHERE id = ?').get(agentId) as any;
+    // Get agent's Solana address from Postgres
+    const agent = await getAgentById(agentId);
     
     if (!agent) {
       return NextResponse.json({
@@ -109,15 +108,8 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
     
-    // Update agent balance in database
-    const updateStmt = db.prepare(`
-      UPDATE agents 
-      SET sol_balance = sol_balance + ?, 
-          status = CASE WHEN status = 'pending_funding' THEN 'funded' ELSE status END,
-          funded_at = CASE WHEN funded_at IS NULL THEN datetime('now') ELSE funded_at END
-      WHERE id = ?
-    `);
-    updateStmt.run(amountSol, agentId);
+    // Update agent balance in Postgres
+    await updateAgentFunding(agentId, amountSol);
     
     return NextResponse.json({
       success: true,

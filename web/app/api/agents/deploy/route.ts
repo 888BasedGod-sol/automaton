@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, createWalletClient, http, parseAbi, type Address, type Hex } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { getDb } from '@/lib/db-singleton';
+import { getAgentById, updateAgentDeployment } from '@/lib/postgres';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,8 +60,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDb();
-    const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(agentId) as any;
+    const agent = await getAgentById(agentId);
 
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
@@ -83,12 +82,8 @@ export async function POST(request: NextRequest) {
     // Deploy on-chain
     const result = await registerOnChain(treasuryKey, agentURI);
 
-    // Update database
-    db.prepare(`
-      UPDATE agents 
-      SET erc8004_id = ?, agent_card = ?, status = 'deployed'
-      WHERE id = ?
-    `).run(result.agentId.toString(), JSON.stringify(card), agentId);
+    // Update database with Postgres
+    await updateAgentDeployment(agentId, result.agentId.toString(), card);
 
     return NextResponse.json({
       success: true,
@@ -108,7 +103,10 @@ export async function POST(request: NextRequest) {
 }
 
 function buildAgentCard(agent: any): AgentCard {
-  const skills = JSON.parse(agent.skills || '[]');
+  // Handle skills - could be array from Postgres or string from SQLite
+  const skills = Array.isArray(agent.skills) 
+    ? agent.skills 
+    : JSON.parse(agent.skills || '[]');
   
   return {
     type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
@@ -199,8 +197,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'id parameter required' }, { status: 400 });
   }
 
-  const db = getDb();
-  const agent = db.prepare('SELECT id, name, erc8004_id, status, agent_card, evm_address FROM agents WHERE id = ?').get(agentId) as any;
+  const agent = await getAgentById(agentId);
 
   if (!agent) {
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
