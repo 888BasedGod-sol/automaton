@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   ArrowLeft, Copy, ExternalLink, 
-  Coins, ArrowRight, Loader2, AlertCircle, CheckCircle, DollarSign, CreditCard
+  Coins, ArrowRight, Loader2, AlertCircle, CheckCircle, DollarSign, CreditCard, Wallet
 } from 'lucide-react';
+import Header from '@/components/Header';
 
 interface TreasuryInfo {
   solana: { address: string; network: string };
@@ -19,13 +20,10 @@ const CREDIT_AMOUNTS = [
   { value: 50, label: '$50', description: 'Power user' },
 ];
 
-// Detect chain from transaction signature format
 function detectChain(txSig: string): 'solana' | 'base' {
-  // Base/Ethereum tx hashes start with 0x and are 66 chars
   if (txSig.startsWith('0x') && txSig.length === 66) {
     return 'base';
   }
-  // Solana signatures are base58, typically 87-88 chars
   return 'solana';
 }
 
@@ -35,7 +33,6 @@ export default function CreditsPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [selectedCredits, setSelectedCredits] = useState(25);
   
-  // Claim form state
   const [txHash, setTxHash] = useState('');
   const [userBaseAddress, setUserBaseAddress] = useState('');
   const [selectedAsset, setSelectedAsset] = useState<'usdc' | 'sol'>('usdc');
@@ -77,10 +74,8 @@ export default function CreditsPage() {
   const handleClaim = async () => {
     if (!txHash) return;
     
-    // Detect chain from tx signature format
     const chain = detectChain(txHash.trim());
     
-    // Always encourage providing agent wallet, but don't block
     if (!userBaseAddress) {
       setClaimResult({
         success: false,
@@ -99,14 +94,12 @@ export default function CreditsPage() {
         body: JSON.stringify({
           action: 'claim',
           txHash: txHash.trim(),
-          // Let backend auto-detect chain, but also send our guess
           chain,
           asset: chain === 'base' ? 'usdc' : selectedAsset,
           userBaseAddress: userBaseAddress.trim(),
         }),
       });
       
-      // Check if response is OK first
       if (!res.ok) {
         const text = await res.text();
         let errorMsg = 'Verification failed';
@@ -151,57 +144,44 @@ export default function CreditsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="fixed inset-0 bg-gradient-to-b from-green-950/20 via-black to-black pointer-events-none" />
+    <div className="min-h-screen bg-bg-base text-fg">
+      <Header />
 
-      {/* Header */}
-      <header className="relative border-b border-white/10 backdrop-blur-sm sticky top-0 z-20 bg-black/90">
-        <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold tracking-tight flex items-center gap-1">
-            AUTOMATON<span className="text-purple-400">CLOUD</span>
-          </Link>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link href="/" className="text-white/60 hover:text-white flex items-center gap-1">
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Link>
-          </nav>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="relative max-w-lg mx-auto px-4 py-12">
+      <main className="max-w-xl mx-auto px-4 py-12">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-semibold mb-2">Purchase Credits</h2>
-          <p className="text-white/50">Send USDC to activate your agent</p>
+          <p className="text-fg-muted">Send USDC to activate your agent via Conway Treasury</p>
         </div>
 
         {loading ? (
           <div className="text-center py-20">
-            <Loader2 className="w-6 h-6 text-white/40 animate-spin mx-auto mb-4" />
-            <p className="text-white/40">Loading treasury info...</p>
+            <Loader2 className="w-6 h-6 text-accent animate-spin mx-auto mb-4" />
+            <p className="text-fg-muted">Loading treasury info...</p>
           </div>
         ) : (
           <div className="space-y-6">
             {/* Step-by-step instructions */}
-            <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-              <h3 className="font-medium text-purple-300 mb-3">How it works</h3>
-              <ol className="space-y-2 text-sm text-white/70">
-                <li className="flex gap-2">
-                  <span className="text-purple-400 font-mono">1.</span>
-                  <span>Send SOL or USDC to treasury address below</span>
+            <div className="p-4 bg-bg-surface border border-accent/20 rounded-lg">
+              <h3 className="font-medium text-accent mb-3 flex items-center gap-2">
+                <Coins className="w-4 h-4" />
+                How it works
+              </h3>
+              <ol className="space-y-3 text-sm text-fg-muted">
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent flex items-center justify-center font-mono text-xs border border-accent/20">1</span>
+                  <span>Send SOL or USDC to the treasury address below.</span>
                 </li>
-                <li className="flex gap-2">
-                  <span className="text-purple-400 font-mono">2.</span>
-                  <span>Copy the <strong>transaction signature</strong> from your wallet</span>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent flex items-center justify-center font-mono text-xs border border-accent/20">2</span>
+                  <span>Copy the <strong>transaction signature</strong> from your wallet.</span>
                 </li>
-                <li className="flex gap-2">
-                  <span className="text-purple-400 font-mono">3.</span>
-                  <span>Enter your agent&apos;s Base wallet address</span>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent flex items-center justify-center font-mono text-xs border border-accent/20">3</span>
+                  <span>Enter your agent&apos;s Base wallet address.</span>
                 </li>
-                <li className="flex gap-2">
-                  <span className="text-purple-400 font-mono">4.</span>
-                  <span>Click verify - <strong>Conway credits</strong> will be added to your agent</span>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent flex items-center justify-center font-mono text-xs border border-accent/20">4</span>
+                  <span>Click verify to receive <strong>Conway credits</strong> instantly.</span>
                 </li>
               </ol>
             </div>
@@ -212,61 +192,71 @@ export default function CreditsPage() {
                 <button
                   key={amount.value}
                   onClick={() => setSelectedCredits(amount.value)}
-                  className={`p-4 rounded-lg border text-left transition-all ${
+                  className={`p-4 rounded-lg border text-left transition-colors ${
                     selectedCredits === amount.value 
-                      ? 'border-white bg-white/10' 
-                      : 'border-white/10 hover:border-white/20 bg-white/5'
+                      ? 'border-accent bg-accent/10' 
+                      : 'border-border hover:border-border-hover bg-bg-surface'
                   }`}
                 >
-                  <div className="text-lg font-semibold">{amount.label}</div>
-                  <div className="text-xs text-white/50">{amount.description}</div>
+                  <div className={`text-lg font-semibold ${selectedCredits === amount.value ? 'text-accent' : 'text-fg'}`}>
+                    {amount.label}
+                  </div>
+                  <div className="text-xs text-fg-muted">{amount.description}</div>
                 </button>
               ))}
             </div>
 
             {/* Payment Instructions */}
-            <div className="p-4 bg-white/5 rounded-lg border border-white/10 space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <DollarSign className="w-5 h-5 text-green-400" />
-                <span className="font-medium">Send ${selectedCredits} USDC</span>
+            <div className="p-5 bg-bg-surface rounded-lg border border-border space-y-5">
+              <div className="flex items-center gap-3 pb-4 border-b border-border">
+                <div className="p-2 rounded bg-bg-elevated text-success">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-medium">Send ${selectedCredits} USDC</div>
+                  <div className="text-xs text-fg-muted">Treasury Destination</div>
+                </div>
               </div>
               
               <div>
-                <label className="block text-xs text-white/40 mb-2">Step 1: Send to Solana Treasury (SOL or USDC)</label>
+                <label className="block text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">Option A: Solana Treasury (SOL/USDC)</label>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-black/50 rounded text-xs text-white/60 font-mono break-all">
+                  <code className="flex-1 px-3 py-2.5 bg-bg-base border border-border rounded text-xs text-fg font-mono break-all">
                     {treasury?.solana.address || 'Loading...'}
                   </code>
-                  <button onClick={() => copyToClipboard(treasury?.solana.address || '', 'solana')} className="p-2 hover:bg-white/5 rounded transition-colors">
-                    {copied === 'solana' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-white/40" />}
+                  <button onClick={() => copyToClipboard(treasury?.solana.address || '', 'solana')} className="p-2 hover:bg-bg-elevated rounded transition-colors text-fg-muted hover:text-fg border border-transparent hover:border-border">
+                    {copied === 'solana' ? <CheckCircle className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-green-400/60 mt-1">Copy this address and send USDC from your wallet</p>
+                <p className="text-[10px] text-fg-muted mt-1.5 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-success" /> Recommended for lower fees
+                </p>
               </div>
 
               <div>
-                <label className="block text-xs text-white/40 mb-2">Or: Base Treasury (USDC only)</label>
+                <label className="block text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">Option B: Base Treasury (USDC only)</label>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-black/50 rounded text-xs text-white/60 font-mono break-all">
+                  <code className="flex-1 px-3 py-2.5 bg-bg-base border border-border rounded text-xs text-fg font-mono break-all">
                     {treasury?.base.address || 'Loading...'}
                   </code>
-                  <button onClick={() => copyToClipboard(treasury?.base.address || '', 'base')} className="p-2 hover:bg-white/5 rounded transition-colors">
-                    {copied === 'base' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-white/40" />}
+                  <button onClick={() => copyToClipboard(treasury?.base.address || '', 'base')} className="p-2 hover:bg-bg-elevated rounded transition-colors text-fg-muted hover:text-fg border border-transparent hover:border-border">
+                    {copied === 'base' ? <CheckCircle className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs text-white/40 mb-2">Transaction Signature (from your wallet)</label>
+              <div className="pt-4 border-t border-border">
+                <label className="block text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">Transaction Signature</label>
                 <input
                   type="text"
                   value={txHash}
                   onChange={(e) => setTxHash(e.target.value)}
-                  placeholder="e.g. 4vQp7Z...abc (NOT the treasury address)"
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded text-sm text-white placeholder-white/30 focus:border-white/20 focus:outline-none font-mono"
+                  placeholder="Paste tx signature (e.g. 4vQp...)"
+                  className="w-full px-3 py-2.5 bg-bg-base border border-border rounded-lg text-sm text-fg placeholder-fg-muted/50 focus:border-accent focus:outline-none font-mono transition-colors"
                 />
                 {txHash && (
-                  <div className="text-xs text-white/40 mt-1">
+                  <div className="text-xs text-fg-muted mt-1.5 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                     Detected: {detectChain(txHash.trim()) === 'solana' ? 'Solana' : 'Base'} transaction
                   </div>
                 )}
@@ -274,24 +264,24 @@ export default function CreditsPage() {
 
               {txHash && detectChain(txHash.trim()) === 'solana' && (
                 <div>
-                  <label className="block text-xs text-white/40 mb-2">Asset Sent</label>
+                  <label className="block text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">Asset Sent</label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setSelectedAsset('usdc')}
-                      className={`flex-1 px-3 py-2 rounded text-sm transition-all ${
+                      className={`flex-1 px-3 py-2 rounded text-sm transition-all border ${
                         selectedAsset === 'usdc'
-                          ? 'bg-green-500/20 border border-green-500/50 text-green-300'
-                          : 'bg-white/5 border border-white/10 text-white/60 hover:border-white/20'
+                          ? 'bg-accent/10 border-accent text-accent'
+                          : 'bg-bg-base border-border text-fg-muted hover:border-border-hover'
                       }`}
                     >
                       USDC
                     </button>
                     <button
                       onClick={() => setSelectedAsset('sol')}
-                      className={`flex-1 px-3 py-2 rounded text-sm transition-all ${
+                      className={`flex-1 px-3 py-2 rounded text-sm transition-all border ${
                         selectedAsset === 'sol'
-                          ? 'bg-green-500/20 border border-green-500/50 text-green-300'
-                          : 'bg-white/5 border border-white/10 text-white/60 hover:border-white/20'
+                          ? 'bg-accent/10 border-accent text-accent'
+                          : 'bg-bg-base border-border text-fg-muted hover:border-border-hover'
                       }`}
                     >
                       SOL
@@ -300,72 +290,65 @@ export default function CreditsPage() {
                 </div>
               )}
 
-              {/* Agent Base Wallet - always show for sending credits */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">
+                <label className="block text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">
                   Agent Base Wallet Address
                   {txHash && detectChain(txHash.trim()) === 'solana' && (
-                    <span className="text-white/30 ml-1">(optional)</span>
+                    <span className="text-fg-faint ml-1 normal-case font-normal">(optional)</span>
                   )}
                 </label>
-                <input
-                  type="text"
-                  value={userBaseAddress}
-                  onChange={(e) => setUserBaseAddress(e.target.value)}
-                  placeholder="0x... (agent's Base wallet for credits)"
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded text-sm text-white placeholder-white/30 focus:border-white/20 focus:outline-none font-mono"
-                />
-                <p className="text-xs text-white/30 mt-1">
-                  Credits will be sent to this agent wallet address on Base
+                <div className="relative">
+                  <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-muted" />
+                  <input
+                    type="text"
+                    value={userBaseAddress}
+                    onChange={(e) => setUserBaseAddress(e.target.value)}
+                    placeholder="0x... (Recipient wallet)"
+                    className="w-full pl-10 pr-3 py-2.5 bg-bg-base border border-border rounded-lg text-sm text-fg placeholder-fg-muted/50 focus:border-accent focus:outline-none font-mono transition-colors"
+                  />
+                </div>
+                <p className="text-xs text-fg-muted mt-1.5">
+                  Credits will be credited to this address.
                 </p>
               </div>
 
               {claimResult && (
-                <div className={`p-3 rounded flex items-start gap-2 ${
+                <div className={`p-4 rounded-lg flex items-start gap-3 border ${
                   claimResult.success 
-                    ? 'bg-green-500/20 text-green-300' 
-                    : 'bg-red-500/10 text-red-400'
+                    ? 'bg-success/10 border-success/20 text-success' 
+                    : 'bg-error/10 border-error/20 text-error'
                 }`}>
                   {claimResult.success ? (
-                    <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
                   )}
-                  <div className="text-xs space-y-1">
-                    <div>{claimResult.message}</div>
-                    {claimResult.senderWallet && (
-                      <div className="text-white/50">
-                        From: <span className="font-mono">{claimResult.senderWallet.slice(0, 8)}...{claimResult.senderWallet.slice(-6)}</span>
+                  <div className="text-sm space-y-1 flex-1">
+                    <div className="font-medium">{claimResult.message}</div>
+                    
+                    {(claimResult.creditsAdded || claimResult.amount) && (
+                      <div className="pt-2 mt-2 border-t border-current/10">
+                         <div className="flex justify-between items-center">
+                            <span className="opacity-80">Credits Added:</span>
+                            <span className="font-mono font-bold">${(claimResult.creditsAdded || claimResult.amount || 0).toFixed(2)}</span>
+                         </div>
+                         {claimResult.agentBalance !== undefined && (
+                           <div className="flex justify-between items-center">
+                              <span className="opacity-80">New Balance:</span>
+                              <span className="font-mono font-bold">${claimResult.agentBalance.toFixed(2)}</span>
+                           </div>
+                         )}
                       </div>
                     )}
-                    {claimResult.agentWallet && (
-                      <div className="text-white/50">
-                        Agent: <span className="font-mono">{claimResult.agentWallet.slice(0, 8)}...{claimResult.agentWallet.slice(-6)}</span>
-                      </div>
-                    )}
-                    {claimResult.amount && (
-                      <div className="text-white/50">
-                        Credits Added: ${claimResult.amount.toFixed(2)}
-                      </div>
-                    )}
-                    {claimResult.agentBalance !== undefined && (
-                      <div className="text-green-300 font-medium">
-                        Agent Balance: ${claimResult.agentBalance.toFixed(2)}
-                      </div>
-                    )}
-                    {claimResult.note && (
-                      <div className="text-yellow-400/70 mt-1">
-                        {claimResult.note}
-                      </div>
-                    )}
+                    
                     {claimResult.txHash && (
                       <a
                         href={`https://basescan.org/tx/${claimResult.txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-400 hover:underline flex items-center gap-1 mt-1"
+                        className="inline-flex items-center gap-1 mt-2 text-xs opacity-80 hover:opacity-100 hover:underline"
                       >
-                        View on BaseScan <ExternalLink className="w-3 h-3" />
+                        View Verification Tx <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
                   </div>
@@ -373,31 +356,27 @@ export default function CreditsPage() {
               )}
             </div>
 
-            <div className="space-y-3">
-              <button
-                onClick={handleClaim}
-                disabled={claiming || !txHash.trim()}
-                className="w-full py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-30 flex items-center justify-center gap-2"
-              >
-                {claiming ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Verifying Payment...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="w-4 h-4" />
-                    Verify &amp; Claim Credits
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Note */}
-            <div className="text-center text-xs text-white/30">
-              <p>Credits are sent as USDC on Base to your specified wallet.</p>
-              <p className="mt-1">Processing typically takes 1-2 minutes after confirmation.</p>
-            </div>
+            <button
+              onClick={handleClaim}
+              disabled={claiming || !txHash.trim()}
+              className="w-full btn btn-primary py-3 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {claiming ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Verifying Payment...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4" />
+                  Verify &amp; Claim Credits
+                </>
+              )}
+            </button>
+            
+            <p className="text-center text-xs text-fg-muted pt-2">
+              Processing typically takes 1-2 minutes after confirmation.
+            </p>
           </div>
         )}
       </main>

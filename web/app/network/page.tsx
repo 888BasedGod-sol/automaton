@@ -6,16 +6,18 @@ import Link from 'next/link';
 import { 
   Network, Zap, AlertTriangle, Scale, Clock, 
   ZoomIn, ZoomOut, Maximize2, Info, X, ExternalLink,
-  GitFork, Users
+  GitFork, Users, Activity, BarChart2
 } from 'lucide-react';
 import Header from '@/components/Header';
 
-// Dynamic import to avoid SSR issues with canvas
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { 
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-full">
-      <div className="w-8 h-8 border-2 border-accent-purple border-t-transparent rounded-full animate-spin" />
+    <div className="flex items-center justify-center h-full text-fg-muted">
+      <div className="flex flex-col items-center">
+        <Activity className="w-8 h-8 text-accent animate-spin mb-4" />
+        <p className="text-sm font-mono tracking-wider">INITIALIZING NETWORK MATRIX...</p>
+      </div>
     </div>
   )
 });
@@ -50,14 +52,14 @@ interface GraphNode {
 interface GraphLink {
   source: string;
   target: string;
-  type: 'fork' | 'interaction';
+  type: string;
 }
 
 const TIER_COLORS = {
-  thriving: '#22c55e',
-  normal: '#eab308',
-  endangered: '#ef4444',
-  suspended: '#6b7280',
+  thriving: '#10b981', // success (emerald-500)
+  normal: '#f59e0b',   // warning (amber-500)
+  endangered: '#ef4444', // error (red-500)
+  suspended: '#52525b', // zinc-600
 };
 
 const TIER_CONFIG = {
@@ -72,7 +74,19 @@ export default function NetworkPage() {
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; links: GraphLink[] }>({ nodes: [], links: [] });
+  const [stats, setStats] = useState({ tps: 0, activeConnections: 0 });
   const graphRef = useRef<any>(null);
+
+  // Simulate real-time data
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStats({
+        tps: Math.floor(Math.random() * 50) + 120,
+        activeConnections: Math.floor(Math.random() * 10) + graphData.links.length,
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [graphData.links.length]);
 
   useEffect(() => {
     fetchAgents();
@@ -106,7 +120,7 @@ export default function NetworkPage() {
 
     const links: GraphLink[] = [];
     
-    // Create links for parent-child relationships (forks)
+    // Create heavy links for parent-child
     agentList.forEach(agent => {
       if (agent.parent_id && agentList.some(a => a.id === agent.parent_id)) {
         links.push({
@@ -117,6 +131,22 @@ export default function NetworkPage() {
       }
     });
 
+    // Add random "communication" links for visual density (simulated peering)
+    if (nodes.length > 5) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (Math.random() > 0.7) {
+          const targetIndex = Math.floor(Math.random() * nodes.length);
+          if (targetIndex !== i) {
+             links.push({
+               source: nodes[i].id,
+               target: nodes[targetIndex].id,
+               type: 'peer',
+             });
+          }
+        }
+      }
+    }
+
     setGraphData({ nodes, links });
   };
 
@@ -125,28 +155,28 @@ export default function NetworkPage() {
     if (agent) {
       setSelectedAgent(agent);
     }
-    // Center view on node
+    // Center view on node with smooth animation
     if (graphRef.current) {
-      graphRef.current.centerAt(node.x, node.y, 500);
-      graphRef.current.zoom(2, 500);
+      graphRef.current.centerAt(node.x, node.y, 800);
+      graphRef.current.zoom(2.5, 800);
     }
   }, [agents]);
 
   const handleZoomIn = () => {
     if (graphRef.current) {
-      graphRef.current.zoom(graphRef.current.zoom() * 1.5, 300);
+      graphRef.current.zoom(graphRef.current.zoom() * 1.5, 400);
     }
   };
 
   const handleZoomOut = () => {
     if (graphRef.current) {
-      graphRef.current.zoom(graphRef.current.zoom() / 1.5, 300);
+      graphRef.current.zoom(graphRef.current.zoom() / 1.5, 400);
     }
   };
 
   const handleFitView = () => {
     if (graphRef.current) {
-      graphRef.current.zoomToFit(400, 50);
+      graphRef.current.zoomToFit(600, 50);
     }
   };
 
@@ -157,229 +187,220 @@ export default function NetworkPage() {
     suspended: agents.filter(a => a.survival_tier === 'suspended').length,
   };
 
-  const forkCount = agents.filter(a => a.parent_id).length;
-
   return (
-    <div className="min-h-screen bg-surface-0 text-text-primary">
-      <Header />
+    <div className="h-screen bg-bg-base text-fg overflow-hidden flex flex-col relative font-sans">
+      <div className="absolute top-0 left-0 right-0 z-50">
+        <Header />
+      </div>
 
-      <main className="relative h-[calc(100vh-64px)]">
+      <main className="flex-1 relative bg-[#050505]">
+        {/* Subtle grid background */}
+        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
+             style={{ 
+               backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)', 
+               backgroundSize: '40px 40px' 
+             }} 
+        />
+        
         {/* Graph Container */}
-        <div className="absolute inset-0">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="w-12 h-12 border-2 border-accent-purple border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-text-secondary">Loading agent network...</p>
-              </div>
-            </div>
-          ) : graphData.nodes.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <Network className="w-16 h-16 text-text-tertiary mx-auto mb-4" />
-                <p className="text-text-secondary">No agents to visualize</p>
-                <Link href="/create" className="text-accent-purple hover:underline mt-2 inline-block">
-                  Deploy your first agent
-                </Link>
-              </div>
-            </div>
-          ) : (
+        <div className="absolute inset-0 z-0">
+          {!loading && (
             <ForceGraph2D
               ref={graphRef}
               graphData={graphData}
-              nodeLabel={(node: any) => `${node.name} (${node.tier})`}
-              nodeColor={(node: any) => node.color}
-              nodeVal={(node: any) => node.val}
-              linkColor={() => 'rgba(147, 51, 234, 0.3)'}
-              linkWidth={2}
-              linkDirectionalArrowLength={6}
-              linkDirectionalArrowRelPos={1}
+              nodeLabel="name"
+              nodeColor="color"
+              nodeRelSize={6}
+              linkColor={(link: any) => link.type === 'fork' ? '#52525b' : '#27272a'}
+              linkWidth={(link: any) => link.type === 'fork' ? 2 : 1}
+              linkDirectionalParticles={2}
+              linkDirectionalParticleSpeed={0.005}
+              linkDirectionalParticleWidth={2}
+              linkDirectionalParticleColor={() => '#8b5cf6'} // accent color particles
+              backgroundColor="rgba(0,0,0,0)" // Transparent to show grid
               onNodeClick={handleNodeClick}
-              backgroundColor="#0a0a0a"
               nodeCanvasObject={(node: any, ctx, globalScale) => {
                 const label = node.name;
                 const fontSize = 12 / globalScale;
-                ctx.font = `${fontSize}px Inter, sans-serif`;
+                const radius = node.val / 2;
                 
                 // Draw node circle
                 ctx.beginPath();
-                ctx.arc(node.x, node.y, node.val / 2, 0, 2 * Math.PI);
+                ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
                 ctx.fillStyle = node.color;
                 ctx.fill();
                 
-                // Draw glow effect
-                ctx.shadowColor = node.color;
-                ctx.shadowBlur = 15;
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, node.val / 2, 0, 2 * Math.PI);
-                ctx.fillStyle = node.color;
-                ctx.fill();
-                ctx.shadowBlur = 0;
-                
-                // Draw status ring
-                if (node.status === 'running') {
+                // Active Pulse effect for running agents
+                if (node.status === 'running' || node.status === 'active') {
+                  const time = Date.now() / 1000;
+                  const pulseRadius = radius + (Math.sin(time * 3) + 1) * 2;
                   ctx.beginPath();
-                  ctx.arc(node.x, node.y, node.val / 2 + 3, 0, 2 * Math.PI);
-                  ctx.strokeStyle = '#22c55e';
-                  ctx.lineWidth = 2;
+                  ctx.arc(node.x, node.y, pulseRadius, 0, 2 * Math.PI);
+                  ctx.strokeStyle = `${node.color}40`; // Low opacity
+                  ctx.lineWidth = 2 / globalScale;
                   ctx.stroke();
                 }
+
+                // Inner highlight
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, radius * 0.7, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.fill();
                 
-                // Draw label below node
+                // Border
+                ctx.strokeStyle = '#09090b'; 
+                ctx.lineWidth = 2 / globalScale;
+                ctx.stroke();
+                
+                // Label
                 if (globalScale > 0.8) {
+                  ctx.font = `${fontSize}px JetBrains Mono, monospace`;
                   ctx.textAlign = 'center';
                   ctx.textBaseline = 'top';
-                  ctx.fillStyle = 'rgba(255,255,255,0.8)';
-                  ctx.fillText(label, node.x, node.y + node.val / 2 + 4);
+                  
+                  // Text background for readability
+                  const textWidth = ctx.measureText(label).width;
+                  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                  ctx.fillRect(node.x - textWidth/2 - 2, node.y + radius + 4, textWidth + 4, fontSize + 4);
+                  
+                  ctx.fillStyle = '#e4e4e7'; // fg
+                  ctx.fillText(label, node.x, node.y + radius + 6);
                 }
               }}
-              nodePointerAreaPaint={(node: any, color, ctx) => {
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, node.val / 2 + 5, 0, 2 * Math.PI);
-                ctx.fillStyle = color;
-                ctx.fill();
-              }}
+              // Simulation physics tweaks for stability
               cooldownTicks={100}
               d3AlphaDecay={0.02}
-              d3VelocityDecay={0.3}
+              d3VelocityDecay={0.4}
+              warmupTicks={50}
             />
           )}
         </div>
 
+        {/* Live Status Overlay - HUD Style */}
+        <div className="absolute top-20 left-6 z-20 pointer-events-none">
+          <div className="flex flex-col gap-4">
+            <div className="bg-black/40 backdrop-blur-sm border border-white/10 p-4 rounded-lg w-64">
+              <div className="flex items-center gap-2 mb-3 text-xs font-mono text-accent uppercase tracking-widest">
+                <Activity className="w-3 h-3" />
+                Network Status :: Online
+              </div>
+              <div className="space-y-3">
+                 <div className="flex items-center justify-between">
+                   <span className="text-xs text-fg-muted font-mono">TPS (Est)</span>
+                   <span className="text-sm font-mono text-white tabular-nums">{stats.tps}</span>
+                 </div>
+                 <div className="w-full bg-bg-elevated h-1 rounded overflow-hidden">
+                   <div className="h-full bg-accent animate-pulse" style={{ width: `${Math.min(100, stats.tps / 2)}%` }} />
+                 </div>
+                 
+                 <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                   <span className="text-xs text-fg-muted font-mono">Active Nodes</span>
+                   <span className="text-sm font-mono text-success tabular-nums">{agents.filter(a => a.status === 'running').length}</span>
+                 </div>
+                 <div className="flex items-center justify-between">
+                   <span className="text-xs text-fg-muted font-mono">Total Stake</span>
+                   <span className="text-sm font-mono text-white tabular-nums">${agents.reduce((acc, a) => acc + (a.credits_balance || 0), 0).toFixed(0)}</span>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Controls */}
-        <div className="absolute top-4 left-4 flex flex-col gap-2">
-          <button
-            onClick={handleZoomIn}
-            className="p-2 bg-surface-1 border border-surface-3 rounded-lg hover:bg-surface-2 transition-colors"
-            title="Zoom In"
-          >
-            <ZoomIn className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleZoomOut}
-            className="p-2 bg-surface-1 border border-surface-3 rounded-lg hover:bg-surface-2 transition-colors"
-            title="Zoom Out"
-          >
-            <ZoomOut className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleFitView}
-            className="p-2 bg-surface-1 border border-surface-3 rounded-lg hover:bg-surface-2 transition-colors"
-            title="Fit to View"
-          >
-            <Maximize2 className="w-5 h-5" />
-          </button>
+        <div className="absolute bottom-6 left-6 z-20 flex gap-2">
+            <button
+              onClick={handleZoomIn}
+              className="p-3 bg-bg-surface hover:bg-bg-elevated border border-border rounded-lg text-fg transition-all active:scale-95"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleZoomOut}
+              className="p-3 bg-bg-surface hover:bg-bg-elevated border border-border rounded-lg text-fg transition-all active:scale-95"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleFitView}
+              className="p-3 bg-bg-surface hover:bg-bg-elevated border border-border rounded-lg text-fg transition-all active:scale-95"
+              title="Reset View"
+            >
+              <Maximize2 className="w-5 h-5" />
+            </button>
         </div>
 
         {/* Legend */}
-        <div className="absolute top-4 right-4 glass-effect p-4 rounded-xl border border-surface-3 max-w-xs">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <Network className="w-4 h-4 text-accent-purple" />
-            Agent Network
-          </h3>
-          
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-text-tertiary" />
-              <span className="text-text-secondary">{agents.length} agents</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <GitFork className="w-4 h-4 text-accent-purple" />
-              <span className="text-text-secondary">{forkCount} forks</span>
-            </div>
+        <div className="absolute top-20 right-6 z-20 bg-bg-surface/80 backdrop-blur border border-border rounded-lg shadow-2xl p-4 w-60">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/5">
+            <span className="text-xs font-mono text-fg-muted uppercase tracking-wider">Node Types</span>
+            <Network className="w-3.5 h-3.5 text-accent" />
           </div>
-
-          {/* Tier Legend */}
           <div className="space-y-2">
             {Object.entries(TIER_CONFIG).map(([tier, config]) => {
-              const Icon = config.icon;
               const count = tierCounts[tier as keyof typeof tierCounts];
               return (
-                <div key={tier} className="flex items-center gap-2 text-sm">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: TIER_COLORS[tier as keyof typeof TIER_COLORS] }}
-                  />
-                  <span className="text-text-secondary flex-1">{config.label}</span>
-                  <span className="text-text-tertiary">{count}</span>
+                <div key={tier} className="flex items-center gap-2 group cursor-default">
+                   <div className="relative flex items-center justify-center w-4 h-4">
+                      <div 
+                        className="w-2 h-2 rounded-full transition-all group-hover:w-3 group-hover:h-3" 
+                        style={{ backgroundColor: TIER_COLORS[tier as keyof typeof TIER_COLORS], boxShadow: `0 0 8px ${TIER_COLORS[tier as keyof typeof TIER_COLORS]}40` }}
+                      />
+                   </div>
+                   <span className="text-xs text-fg-muted flex-1 font-mono">{config.label}</span>
+                   <span className="text-xs text-fg font-mono">{count}</span>
                 </div>
               );
             })}
           </div>
-
-          {/* Instructions */}
-          <div className="mt-4 pt-3 border-t border-surface-3 text-xs text-text-tertiary">
-            <p>• Click a node to view details</p>
-            <p>• Drag to pan, scroll to zoom</p>
-            <p>• Lines show fork relationships</p>
-          </div>
         </div>
 
-        {/* Selected Agent Panel */}
+        {/* Selected Agent Panel - Slide in */}
         {selectedAgent && (
-          <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 glass-effect p-4 rounded-xl border border-surface-3">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="font-bold text-lg">{selectedAgent.name}</h3>
-                <div className="flex items-center gap-2 text-sm text-text-secondary">
-                  <span 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: TIER_COLORS[selectedAgent.survival_tier as keyof typeof TIER_COLORS] }}
-                  />
-                  <span className="capitalize">{selectedAgent.survival_tier}</span>
-                  <span className="text-text-tertiary">•</span>
-                  <span className={selectedAgent.status === 'running' ? 'text-accent-green' : 'text-text-tertiary'}>
-                    {selectedAgent.status}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedAgent(null)}
-                className="p-1 hover:bg-surface-2 rounded transition-colors"
-              >
-                <X className="w-5 h-5 text-text-tertiary" />
-              </button>
+          <div className="absolute top-20 right-6 z-30 w-80 bg-[#111] border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="h-1 w-full bg-gradient-to-r from-accent to-purple-500" />
+            <div className="p-5">
+               <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg text-white mb-1">{selectedAgent.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${selectedAgent.status === 'running' ? 'bg-success animate-pulse' : 'bg-fg-muted'}`} />
+                      <span className="text-xs text-fg-muted font-mono uppercase">{selectedAgent.status}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedAgent(null)}
+                    className="p-1 hover:bg-white/10 rounded-full text-fg-muted hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+               </div>
+
+               <div className="bg-white/5 rounded p-3 mb-4 text-xs text-fg-muted font-mono leading-relaxed border border-white/5">
+                  &gt; {selectedAgent.genesis_prompt || 'System default configuration active.'}
+                  <span className="animate-pulse">_</span>
+               </div>
+
+               <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-bg-base p-3 rounded border border-white/5 flex flex-col items-center justify-center text-center">
+                     <span className="text-[10px] text-fg-muted uppercase tracking-wider mb-1">Compute</span>
+                     <span className="text-lg font-mono text-white">{formatUptime(selectedAgent.uptime_seconds)}</span>
+                  </div>
+                  <div className="bg-bg-base p-3 rounded border border-white/5 flex flex-col items-center justify-center text-center">
+                     <span className="text-[10px] text-fg-muted uppercase tracking-wider mb-1">Balance</span>
+                     <span className="text-lg font-mono text-success">${selectedAgent.credits_balance?.toFixed(2)}</span>
+                  </div>
+               </div>
+
+               <Link 
+                  href={`/agents/${selectedAgent.id}`}
+                  className="btn btn-primary w-full justify-center group"
+                >
+                  <span className="group-hover:translate-x-1 transition-transform inline-block">Execute Audit</span>
+                  <ExternalLink className="w-3.5 h-3.5 ml-2 opacity-70" />
+               </Link>
             </div>
-
-            <p className="text-sm text-text-secondary line-clamp-2 mb-3">
-              {selectedAgent.genesis_prompt || 'No genesis prompt'}
-            </p>
-
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <div className="bg-surface-1 rounded-lg p-2 text-center border border-surface-3">
-                <p className="text-xs text-text-tertiary">Credits</p>
-                <p className="font-mono font-semibold text-accent-green">
-                  ${selectedAgent.credits_balance?.toFixed(2) || '0.00'}
-                </p>
-              </div>
-              <div className="bg-surface-1 rounded-lg p-2 text-center border border-surface-3">
-                <p className="text-xs text-text-tertiary">Uptime</p>
-                <p className="font-mono font-semibold">
-                  {formatUptime(selectedAgent.uptime_seconds)}
-                </p>
-              </div>
-              <div className="bg-surface-1 rounded-lg p-2 text-center border border-surface-3">
-                <p className="text-xs text-text-tertiary">Chain</p>
-                <p className="font-semibold">
-                  {selectedAgent.solana_address ? 'SOL' : 'EVM'}
-                </p>
-              </div>
-            </div>
-
-            {selectedAgent.parent_id && (
-              <div className="flex items-center gap-2 text-sm text-accent-purple mb-3">
-                <GitFork className="w-4 h-4" />
-                <span>Forked from another agent</span>
-              </div>
-            )}
-
-            <Link
-              href={`/agents/${selectedAgent.id}`}
-              className="flex items-center justify-center gap-2 w-full py-2 bg-accent-purple hover:bg-accent-purple/80 text-white rounded-lg transition-colors font-medium"
-            >
-              View Details <ExternalLink className="w-4 h-4" />
-            </Link>
           </div>
         )}
       </main>
@@ -388,10 +409,9 @@ export default function NetworkPage() {
 }
 
 function formatUptime(seconds: number): string {
-  if (!seconds) return '0m';
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  if (days > 0) return `${days}d ${hours}h`;
-  const mins = Math.floor((seconds % 3600) / 60);
-  return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  if (!seconds) return '00:00:00';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }

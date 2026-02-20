@@ -1,0 +1,8 @@
+Vercel CLI 50.0.0
+Retrieving project…
+Deploying zachary-louberts-projects/automaton-cloud
+Uploading [--------------------] (0.0B/2.5MB)
+Uploading [=====---------------] (635.6KB/2.5MB)
+Uploading [==========----------] (1.2MB/2.5MB)
+Uploading [===============-----] (1.8MB/2.5MB)
+Uploading [====================] (2.5MB/2.5MB)

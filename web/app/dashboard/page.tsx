@@ -14,7 +14,7 @@ import StatCard from '@/components/StatCard';
 
 const WalletMultiButton = dynamic(
   async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
-  { ssr: false, loading: () => <div className="h-10 w-40 bg-accent-purple/50 rounded-lg animate-pulse" /> }
+  { ssr: false, loading: () => <div className="h-10 w-40 bg-bg-elevated rounded animate-pulse" /> }
 );
 
 interface Agent {
@@ -32,18 +32,18 @@ interface Agent {
 }
 
 const TIER_CONFIG = {
-  thriving: { color: 'text-accent-green', bg: 'bg-accent-green/10', border: 'border-accent-green/30', icon: Zap },
-  normal: { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', icon: Scale },
-  endangered: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30', icon: AlertTriangle },
-  suspended: { color: 'text-text-tertiary', bg: 'bg-surface-2', border: 'border-surface-3', icon: Clock },
+  thriving: { color: 'text-success', bg: 'bg-success/10', border: 'border-success/30', icon: Zap },
+  normal: { color: 'text-warning', bg: 'bg-warning/10', border: 'border-warning/30', icon: Scale },
+  endangered: { color: 'text-error', bg: 'bg-error/10', border: 'border-error/30', icon: AlertTriangle },
+  suspended: { color: 'text-fg-muted', bg: 'bg-bg-elevated', border: 'border-border', icon: Clock },
 };
 
 const STATUS_CONFIG = {
-  running: { color: 'text-accent-green', dot: 'status-dot-online' },
-  pending: { color: 'text-yellow-400', dot: 'status-dot-warning' },
-  funded: { color: 'text-accent-cyan', dot: 'status-dot-online' },
-  suspended: { color: 'text-red-400', dot: 'status-dot-error' },
-  terminated: { color: 'text-text-tertiary', dot: 'bg-text-tertiary' },
+  running: { color: 'text-success', dot: 'bg-success' },
+  pending: { color: 'text-warning', dot: 'bg-warning' },
+  funded: { color: 'text-accent', dot: 'bg-accent' },
+  suspended: { color: 'text-error', dot: 'bg-error' },
+  terminated: { color: 'text-fg-muted', dot: 'bg-fg-muted' },
 };
 
 export default function Dashboard() {
@@ -116,30 +116,23 @@ export default function Dashboard() {
   const totalUptime = agents.reduce((sum, a) => sum + (a.uptime_seconds || 0), 0);
 
   return (
-    <div className="min-h-screen bg-surface-0 text-text-primary">
-      <div className="fixed inset-0 bg-gradient-to-b from-accent-purple/5 via-transparent to-transparent pointer-events-none" />
-
+    <div className="min-h-screen bg-bg-base text-fg">
       <Header />
 
-      <main className="relative max-w-6xl mx-auto px-4 py-8">
+      <main className="relative max-w-6xl mx-auto px-6 py-12">
         {/* Not Connected State */}
         {!connected && (
           <div className="text-center py-20">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent-purple/20 to-accent-cyan/20 flex items-center justify-center mx-auto mb-6 border border-accent-purple/30">
-              <Wallet className="w-10 h-10 text-accent-purple" />
+            <div className="w-16 h-16 rounded bg-bg-surface flex items-center justify-center mx-auto mb-6 border border-border dashed">
+              <Wallet className="w-8 h-8 text-fg-muted" />
             </div>
-            <h1 className="text-3xl font-bold mb-4 gradient-text">My Agents Dashboard</h1>
-            <p className="text-text-secondary mb-8 max-w-md mx-auto">
+            <h1 className="text-3xl font-semibold mb-4 text-fg">My Agents Dashboard</h1>
+            <p className="text-fg-muted mb-8 max-w-md mx-auto">
               Connect your Solana wallet to view and manage the agents you've deployed.
             </p>
-            <WalletMultiButton style={{
-              background: 'linear-gradient(135deg, #9333ea 0%, #06b6d4 100%)',
-              borderRadius: '12px',
-              fontSize: '16px',
-              height: '52px',
-              padding: '0 32px',
-              border: 'none',
-            }} />
+            <div className="flex justify-center">
+              <WalletMultiButton />
+            </div>
           </div>
         )}
 
@@ -149,16 +142,16 @@ export default function Dashboard() {
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-2xl font-bold mb-2">My Agents</h1>
+                <h1 className="text-2xl font-semibold mb-2">My Agents</h1>
                 <button
                   onClick={copyAddress}
-                  className="flex items-center gap-2 text-text-secondary text-sm font-mono hover:text-accent-purple transition-colors group"
+                  className="flex items-center gap-2 text-fg-muted text-sm font-mono hover:text-accent transition-colors group px-2 py-1 -ml-2 rounded hover:bg-bg-surface"
                 >
                   {publicKey.toBase58().slice(0, 8)}...{publicKey.toBase58().slice(-8)}
                   {copied ? (
-                    <Check className="w-4 h-4 text-accent-green" />
+                    <Check className="w-3.5 h-3.5 text-success" />
                   ) : (
-                    <Copy className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Copy className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                   )}
                 </button>
               </div>
@@ -166,20 +159,20 @@ export default function Dashboard() {
                 <button
                   onClick={fetchMyAgents}
                   disabled={loading}
-                  className="p-2.5 text-text-secondary hover:text-text-primary bg-surface-1 hover:bg-surface-2 border border-surface-3 rounded-lg transition-all"
+                  className="p-2.5 text-fg-muted hover:text-fg bg-bg-surface hover:bg-bg-elevated border border-border rounded transition-all"
                 >
-                  <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
                 <Link
                   href="/infrastructure"
-                  className="px-4 py-2.5 bg-surface-1 hover:bg-surface-2 text-text-primary border border-surface-3 rounded-lg transition-colors flex items-center gap-2"
+                  className="px-4 py-2.5 bg-bg-surface hover:bg-bg-elevated text-fg border border-border rounded transition-colors flex items-center gap-2 text-sm font-medium"
                 >
                   <Terminal className="w-4 h-4" />
                   Infrastructure
                 </Link>
                 <Link
                   href="/create"
-                  className="px-4 py-2.5 bg-gradient-to-r from-accent-purple to-accent-cyan hover:opacity-90 text-white rounded-lg transition-opacity flex items-center gap-2 font-medium"
+                  className="btn btn-primary flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Deploy Agent
@@ -192,55 +185,53 @@ export default function Dashboard() {
               <StatCard
                 label="Total Agents"
                 value={agents.length.toString()}
-                icon={<Users className="w-5 h-5" />}
+                icon={<Users className="w-4 h-4" />}
               />
               <StatCard
                 label="Active"
                 value={activeAgents.toString()}
-                icon={<Activity className="w-5 h-5" />}
-                change={agents.length > 0 ? Math.round((activeAgents / agents.length) * 100) : undefined}
-                trend={activeAgents > 0 ? 'up' : 'neutral'}
+                icon={<Activity className="w-4 h-4" />}
               />
               <StatCard
                 label="Total Credits"
                 value={`$${totalCredits.toFixed(2)}`}
-                icon={<Coins className="w-5 h-5" />}
+                icon={<Coins className="w-4 h-4" />}
               />
               <StatCard
                 label="Combined Uptime"
                 value={formatUptime(totalUptime)}
-                icon={<Clock className="w-5 h-5" />}
+                icon={<Clock className="w-4 h-4" />}
               />
             </div>
 
             {/* Loading */}
             {loading && (
               <div className="text-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-accent-purple mx-auto" />
+                <Loader2 className="w-6 h-6 animate-spin text-accent mx-auto" />
               </div>
             )}
 
             {/* Error */}
             {error && (
-              <div className="text-center py-12 glass-effect rounded-xl border border-red-500/30">
-                <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                <p className="text-red-400">{error}</p>
+              <div className="text-center py-12 card border-error/30 bg-error/5">
+                <AlertTriangle className="w-10 h-10 text-error mx-auto mb-4" />
+                <p className="text-error">{error}</p>
               </div>
             )}
 
             {/* No Agents */}
             {!loading && !error && agents.length === 0 && (
-              <div className="text-center py-16 glass-effect rounded-xl border border-surface-3">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-purple/20 to-accent-cyan/20 flex items-center justify-center mx-auto mb-4 border border-accent-purple/30">
-                  <Plus className="w-8 h-8 text-accent-purple" />
+              <div className="text-center py-24 card border-dashed">
+                <div className="w-16 h-16 rounded bg-bg-elevated flex items-center justify-center mx-auto mb-4">
+                  <Plus className="w-8 h-8 text-fg-muted" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">No agents yet</h3>
-                <p className="text-text-secondary mb-6">Deploy your first autonomous agent to get started</p>
+                <h3 className="text-lg font-medium mb-2">No agents yet</h3>
+                <p className="text-fg-muted mb-6 text-sm">Deploy your first autonomous agent to get started</p>
                 <Link
                   href="/create"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-accent-purple to-accent-cyan hover:opacity-90 text-white rounded-lg transition-opacity font-medium"
+                  className="btn btn-primary inline-flex items-center gap-2"
                 >
-                  Deploy Your First Agent <ArrowRight className="w-4 h-4" />
+                  Deploy First Agent <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             )}
@@ -257,52 +248,58 @@ export default function Dashboard() {
                   return (
                     <div
                       key={agent.id}
-                      className="glass-effect border border-surface-3 rounded-xl overflow-hidden card-hover"
+                      className="card p-0 overflow-hidden group hover:border-accent/30 transition-colors"
                     >
                       <Link href={`/agents/${agent.id}`} className="block p-5">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-2">
-                              <h3 className="text-lg font-semibold truncate">{agent.name}</h3>
-                              <span className={`flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${tier.bg} ${tier.color} ${tier.border} border`}>
+                              <h3 className="text-lg font-medium truncate group-hover:text-accent transition-colors">{agent.name}</h3>
+                              <span className={`flex items-center gap-1.5 text-[10px] uppercase font-medium px-2 py-0.5 rounded border ${tier.bg} ${tier.color} ${tier.border}`}>
                                 <TierIcon className="w-3 h-3" />
                                 {agent.survival_tier}
                               </span>
                               <span className={`flex items-center gap-1.5 text-xs ${status.color}`}>
-                                <span className={`w-2 h-2 rounded-full ${status.dot}`} />
-                                {agent.status}
+                                <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                                <span className="capitalize">{agent.status}</span>
                               </span>
                             </div>
-                            <p className="text-text-secondary text-sm line-clamp-1 max-w-xl">
+                            <p className="text-fg-muted text-sm line-clamp-1 max-w-xl font-mono opacity-80">
                               {agent.genesis_prompt}
                             </p>
                           </div>
                           
-                          <div className="flex items-center gap-6 text-sm ml-4">
+                          <div className="flex items-center gap-8 text-sm ml-6">
                             <div className="text-right">
-                              <p className="text-xs text-text-tertiary mb-1">Credits</p>
-                              <p className="text-accent-green font-mono font-medium">${agent.credits_balance?.toFixed(2) || '0.00'}</p>
+                              <p className="text-[10px] uppercase tracking-wider text-fg-muted mb-0.5">Credits</p>
+                              <p className="text-success font-mono font-medium">${agent.credits_balance?.toFixed(2) || '0.00'}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-xs text-text-tertiary mb-1">Uptime</p>
-                              <p className="font-mono">{formatUptime(agent.uptime_seconds || 0)}</p>
+                              <p className="text-[10px] uppercase tracking-wider text-fg-muted mb-0.5">Uptime</p>
+                              <p className="font-mono text-fg">{formatUptime(agent.uptime_seconds || 0)}</p>
                             </div>
                           </div>
                         </div>
                       </Link>
                       
                       {/* Control Panel */}
-                      <div className="flex items-center justify-between px-5 py-3 bg-surface-1 border-t border-surface-3">
-                        <div className="flex items-center gap-4 text-xs text-text-tertiary font-mono">
-                          <span>EVM: {agent.evm_address.slice(0, 10)}...</span>
-                          <span>SOL: {agent.solana_address.slice(0, 8)}...</span>
+                      <div className="flex items-center justify-between px-5 py-3 bg-bg-surface/50 border-t border-border">
+                        <div className="flex items-center gap-4 text-[10px] text-fg-muted font-mono uppercase tracking-wider">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-1 h-1 rounded-full bg-border"></span>
+                            EVM: {agent.evm_address.slice(0, 10)}...
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-1 h-1 rounded-full bg-border"></span>
+                            SOL: {agent.solana_address.slice(0, 8)}...
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
                           {!isRunning ? (
                             <button
                               onClick={(e) => { e.preventDefault(); handleAgentAction(agent.id, 'start'); }}
-                              disabled={actionLoading === `${agent.id}-start`}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent-green/10 text-accent-green hover:bg-accent-green/20 rounded-lg transition-colors"
+                              disabled={!!actionLoading}
+                              className="btn btn-ghost text-success hover:text-success hover:bg-success/10 text-xs px-3 py-1.5 h-auto flex items-center gap-1.5"
                             >
                               {actionLoading === `${agent.id}-start` ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -314,8 +311,8 @@ export default function Dashboard() {
                           ) : (
                             <button
                               onClick={(e) => { e.preventDefault(); handleAgentAction(agent.id, 'stop'); }}
-                              disabled={actionLoading === `${agent.id}-stop`}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                              disabled={!!actionLoading}
+                              className="btn btn-ghost text-error hover:text-error hover:bg-error/10 text-xs px-3 py-1.5 h-auto flex items-center gap-1.5"
                             >
                               {actionLoading === `${agent.id}-stop` ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -327,8 +324,8 @@ export default function Dashboard() {
                           )}
                           <button
                             onClick={(e) => { e.preventDefault(); handleAgentAction(agent.id, 'restart'); }}
-                            disabled={actionLoading === `${agent.id}-restart`}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-surface-2 text-text-secondary hover:text-text-primary border border-surface-3 rounded-lg transition-colors"
+                            disabled={!!actionLoading}
+                            className="btn btn-secondary text-xs px-3 py-1.5 h-auto flex items-center gap-1.5"
                           >
                             {actionLoading === `${agent.id}-restart` ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -339,8 +336,8 @@ export default function Dashboard() {
                           </button>
                           <button
                             onClick={(e) => { e.preventDefault(); handleAgentAction(agent.id, 'deploy'); }}
-                            disabled={actionLoading === `${agent.id}-deploy`}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent-purple/10 text-accent-purple hover:bg-accent-purple/20 rounded-lg transition-colors"
+                            disabled={!!actionLoading}
+                            className="btn btn-secondary text-accent hover:text-accent hover:bg-accent/10 border-accent/20 text-xs px-3 py-1.5 h-auto flex items-center gap-1.5"
                           >
                             {actionLoading === `${agent.id}-deploy` ? (
                               <Loader2 className="w-3 h-3 animate-spin" />

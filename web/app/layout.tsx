@@ -53,7 +53,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://mainnet.base.org" />
         <link rel="dns-prefetch" href="https://marketplace.olas.network" />
       </head>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans bg-black text-white min-h-screen antialiased`}>
+      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans bg-bg-base text-fg min-h-screen antialiased`}>
         <Providers>
           {children}
         </Providers>

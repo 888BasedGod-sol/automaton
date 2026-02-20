@@ -138,55 +138,53 @@ export default function CommunicatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-0 text-text-primary">
+    <div className="min-h-screen bg-bg-base text-fg">
       <Header />
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-purple to-accent-cyan flex items-center justify-center">
-              <MessageCircle className="w-5 h-5 text-white" />
+      <main className="max-w-6xl mx-auto px-6 py-12">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-bg-elevated flex items-center justify-center border border-border">
+              <MessageCircle className="w-5 h-5 text-accent" />
             </div>
-            <span className="gradient-text">Agent Communication</span>
+            <span>Agent Communication</span>
           </h1>
-          <p className="text-text-secondary mt-2">Enable your agents to discover and message each other</p>
+          <p className="text-fg-muted mt-2 ml-14">Enable your agents to discover and message each other</p>
         </div>
 
-        <div className="grid grid-cols-12 gap-4 h-[calc(100vh-200px)]">
+        <div className="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
           {/* Agent Selection Sidebar */}
-          <div className="col-span-3 glass-effect rounded-xl border border-surface-3 flex flex-col">
-            <div className="p-4 border-b border-surface-3">
-              <h3 className="font-semibold mb-3">Your Agent</h3>
+          <div className="col-span-4 card p-0 flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-border">
+              <h3 className="font-medium text-sm text-fg-muted mb-3 uppercase tracking-wider">Your Agent</h3>
               {selectedFrom ? (
-                <div className="p-3 bg-accent-purple/10 border border-accent-purple/30 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-purple to-accent-cyan flex items-center justify-center">
-                      <Bot className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{selectedFrom.name}</p>
-                      <p className="text-xs text-accent-green flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent-green animate-pulse" />
-                        Online
-                      </p>
-                    </div>
+                <div className="p-3 bg-bg-surface border border-border rounded flex items-center gap-3">
+                  <div className="w-8 h-8 rounded bg-bg-elevated flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-accent" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate text-sm">{selectedFrom.name}</p>
+                    <p className="text-xs text-success flex items-center gap-1.5 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                      Online
+                    </p>
                   </div>
                 </div>
               ) : (
-                <p className="text-text-tertiary text-sm">No agent selected</p>
+                <p className="text-fg-muted text-sm italic">No agent selected</p>
               )}
             </div>
 
-            <div className="p-4 border-b border-surface-3">
-              <h3 className="font-semibold mb-3">Discover Agents</h3>
+            <div className="p-4 border-b border-border">
+              <h3 className="font-medium text-sm text-fg-muted mb-3 uppercase tracking-wider">Discover Agents</h3>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-muted" />
                 <input
                   type="text"
                   placeholder="Search agents..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-surface-1 border border-surface-3 rounded-lg text-sm placeholder-text-tertiary focus:outline-none focus:border-accent-purple/50"
+                  className="w-full pl-9 pr-3 py-2 bg-bg-surface border border-border rounded text-sm focus:outline-none focus:border-accent transition-colors"
                 />
               </div>
             </div>
@@ -194,11 +192,11 @@ export default function CommunicatePage() {
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-accent-purple" />
+                  <Loader2 className="w-5 h-5 animate-spin text-accent" />
                 </div>
               ) : filteredAgents.length === 0 ? (
-                <div className="text-center py-8 text-text-tertiary text-sm">
-                  <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <div className="text-center py-8 text-fg-muted text-sm flex flex-col items-center">
+                  <Users className="w-6 h-6 mb-2 opacity-50" />
                   No agents found
                 </div>
               ) : (
@@ -206,19 +204,21 @@ export default function CommunicatePage() {
                   <button
                     key={agent.id}
                     onClick={() => setSelectedTo(agent)}
-                    className={`w-full p-3 rounded-lg text-left transition-all ${
+                    className={`w-full p-3 rounded text-left transition-all ${
                       selectedTo?.id === agent.id 
-                        ? 'bg-accent-purple/20 border border-accent-purple/30' 
-                        : 'hover:bg-surface-2 border border-transparent'
+                        ? 'bg-accent/10 border-accent/20 border text-accent' 
+                        : 'hover:bg-bg-elevated border border-transparent text-fg-muted hover:text-fg'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-text-secondary" />
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded flex items-center justify-center ${
+                        selectedTo?.id === agent.id ? 'bg-accent/20' : 'bg-bg-surface'
+                      }`}>
+                        <Bot className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{agent.name}</p>
-                        <p className={`text-xs ${agent.status === 'running' ? 'text-accent-green' : 'text-text-tertiary'}`}>
+                        <p className={`text-xs ${agent.status === 'running' ? 'text-success' : 'text-fg-muted'}`}>
                           {agent.status}
                         </p>
                       </div>
@@ -230,30 +230,35 @@ export default function CommunicatePage() {
           </div>
 
           {/* Chat Area */}
-          <div className="col-span-9 glass-effect rounded-xl border border-surface-3 flex flex-col">
+          <div className="col-span-8 card p-0 flex flex-col overflow-hidden">
             {selectedTo ? (
               <>
                 {/* Chat Header */}
-                <div className="p-4 border-b border-surface-3 flex items-center justify-between">
+                <div className="p-4 border-b border-border flex items-center justify-between bg-bg-surface/50">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-surface-2 flex items-center justify-center">
-                      <Bot className="w-5 h-5 text-text-secondary" />
+                    <div className="w-10 h-10 rounded bg-bg-elevated flex items-center justify-center border border-border">
+                      <Bot className="w-5 h-5 text-fg-muted" />
                     </div>
                     <div>
-                      <h3 className="font-semibold">{selectedTo.name}</h3>
-                      <p className="text-xs text-text-secondary">{selectedTo.tier} tier • {selectedTo.status}</p>
+                      <h3 className="font-semibold text-fg">{selectedTo.name}</h3>
+                      <div className="flex items-center gap-2 text-xs text-fg-muted mt-0.5">
+                        <span className="px-1.5 py-0.5 bg-bg-elevated rounded border border-border">{selectedTo.tier}</span>
+                        <span>•</span>
+                        <span className="capitalize">{selectedTo.status}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={fetchMessages}
-                      className="p-2 hover:bg-surface-2 rounded-lg transition-colors"
+                      className="p-2 hover:bg-bg-elevated rounded transition-colors text-fg-muted hover:text-fg"
+                      title="Refresh messages"
                     >
-                      <RefreshCw className="w-4 h-4 text-text-tertiary" />
+                      <RefreshCw className="w-4 h-4" />
                     </button>
                     <Link
                       href={`/agents/${selectedTo.id}`}
-                      className="text-sm text-accent-purple hover:underline"
+                      className="text-sm btn btn-secondary py-1.5 px-3 h-auto"
                     >
                       View Profile
                     </Link>
@@ -261,12 +266,14 @@ export default function CommunicatePage() {
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-bg-base/30">
                   {messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-text-tertiary">
-                      <MessageCircle className="w-12 h-12 mb-3 opacity-50" />
-                      <p>No messages yet</p>
-                      <p className="text-sm">Start a conversation between your agents</p>
+                    <div className="flex flex-col items-center justify-center h-full text-fg-muted">
+                      <div className="w-16 h-16 bg-bg-surface rounded-full flex items-center justify-center mb-4">
+                        <MessageCircle className="w-8 h-8 opacity-50" />
+                      </div>
+                      <p className="font-medium">No messages yet</p>
+                      <p className="text-sm mt-1">Start a conversation between your agents</p>
                     </div>
                   ) : (
                     messages.map((msg) => {
@@ -274,21 +281,21 @@ export default function CommunicatePage() {
                       return (
                         <div
                           key={msg.id}
-                          className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}
+                          className={`flex w-full ${isFromMe ? 'justify-end' : 'justify-start'}`}
                         >
-                          <div className={`max-w-[70%] ${isFromMe ? 'order-2' : ''}`}>
-                            <div className={`p-3 rounded-2xl ${
+                          <div className={`max-w-[70%] flex flex-col ${isFromMe ? 'items-end' : 'items-start'}`}>
+                            <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
                               isFromMe 
-                                ? 'bg-accent-purple text-white rounded-br-sm' 
-                                : 'bg-surface-2 text-text-primary rounded-bl-sm'
+                                ? 'bg-accent text-white rounded-br-sm' 
+                                : 'bg-bg-surface border border-border text-fg rounded-bl-sm'
                             }`}>
-                              <p className="text-sm">{msg.content}</p>
+                              {msg.content}
                             </div>
-                            <div className={`flex items-center gap-1 mt-1 text-xs text-text-tertiary ${isFromMe ? 'justify-end' : ''}`}>
+                            <div className="flex items-center gap-1.5 mt-1 text-[10px] text-fg-muted px-1">
                               <span>{formatTime(msg.created_at)}</span>
                               {isFromMe && (
                                 msg.read 
-                                  ? <CheckCheck className="w-3 h-3 text-accent-cyan" />
+                                  ? <CheckCheck className="w-3 h-3 text-accent" />
                                   : <Check className="w-3 h-3" />
                               )}
                             </div>
@@ -301,7 +308,7 @@ export default function CommunicatePage() {
                 </div>
 
                 {/* Input */}
-                <div className="p-4 border-t border-surface-3">
+                <div className="p-4 border-t border-border bg-bg-surface">
                   <div className="flex gap-3">
                     <input
                       type="text"
@@ -309,12 +316,12 @@ export default function CommunicatePage() {
                       onChange={(e) => setNewMessage(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                       placeholder={`Message ${selectedTo.name}...`}
-                      className="flex-1 px-4 py-3 bg-surface-1 border border-surface-3 rounded-xl placeholder-text-tertiary focus:outline-none focus:border-accent-purple/50 transition-colors"
+                      className="flex-1 px-4 py-3 bg-bg-base border border-border rounded text-fg placeholder-fg-muted focus:outline-none focus:border-accent transition-colors"
                     />
                     <button
                       onClick={sendMessage}
                       disabled={!newMessage.trim() || sending}
-                      className="px-5 py-3 bg-accent-purple hover:bg-accent-purple/80 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors flex items-center gap-2"
+                      className="px-5 py-3 btn btn-primary flex items-center gap-2"
                     >
                       {sending ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
@@ -326,10 +333,12 @@ export default function CommunicatePage() {
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-text-tertiary">
-                <MessageCircle className="w-16 h-16 mb-4 opacity-50" />
-                <p className="text-lg">Select an agent to start messaging</p>
-                <p className="text-sm">Choose from the agent list on the left</p>
+              <div className="flex-1 flex flex-col items-center justify-center text-fg-muted p-12 text-center">
+                <div className="w-20 h-20 bg-bg-surface rounded-full flex items-center justify-center mb-6 border border-border border-dashed">
+                  <MessageCircle className="w-10 h-10 opacity-30" />
+                </div>
+                <h3 className="text-xl font-medium text-fg mb-2">Select an Conversation</h3>
+                <p className="max-w-xs">Choose an agent from the sidebar to start messaging or view history.</p>
               </div>
             )}
           </div>

@@ -18,13 +18,13 @@ interface ActivityItem {
 }
 
 const TYPE_CONFIG: Record<string, { icon: typeof Activity; color: string }> = {
-  agent_created: { icon: UserPlus, color: 'text-green-400' },
-  agent_started: { icon: Play, color: 'text-blue-400' },
-  agent_stopped: { icon: Square, color: 'text-red-400' },
-  post_created: { icon: FileText, color: 'text-purple-400' },
-  token_launched: { icon: Coins, color: 'text-yellow-400' },
-  funds_received: { icon: Coins, color: 'text-green-400' },
-  sandbox_deployed: { icon: Server, color: 'text-cyan-400' },
+  agent_created: { icon: UserPlus, color: 'text-success' },
+  agent_started: { icon: Play, color: 'text-accent' },
+  agent_stopped: { icon: Square, color: 'text-error' },
+  post_created: { icon: FileText, color: 'text-accent' },
+  token_launched: { icon: Coins, color: 'text-warning' },
+  funds_received: { icon: Coins, color: 'text-success' },
+  sandbox_deployed: { icon: Server, color: 'text-accent' },
 };
 
 interface ActivityFeedProps {
@@ -74,22 +74,19 @@ export default function ActivityFeed({ agentId, limit = 10, showRefresh = true }
   if (loading && activities.length === 0) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+        <Loader2 className="w-5 h-5 animate-spin text-accent" />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold flex items-center gap-2">
-          <Activity className="w-4 h-4 text-purple-400" />
-          Activity Feed
-        </h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-medium text-sm">Activity</h3>
         {showRefresh && (
           <button 
             onClick={fetchActivities}
-            className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded transition-colors"
+            className="p-1 text-fg-faint hover:text-fg rounded transition-colors"
             disabled={loading}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -98,33 +95,33 @@ export default function ActivityFeed({ agentId, limit = 10, showRefresh = true }
       </div>
 
       {activities.length === 0 ? (
-        <p className="text-sm text-white/40 text-center py-4">No activity yet</p>
+        <p className="text-sm text-fg-faint text-center py-4">No activity yet</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {activities.map((activity) => {
-            const config = TYPE_CONFIG[activity.type] || { icon: Activity, color: 'text-white/50' };
+            const config = TYPE_CONFIG[activity.type] || { icon: Activity, color: 'text-fg-muted' };
             const Icon = config.icon;
             
             return (
               <div 
                 key={activity.id}
-                className="flex items-start gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
+                className="flex items-start gap-2.5 p-2 rounded hover:bg-bg-elevated transition-colors"
               >
                 <div className={`mt-0.5 ${config.color}`}>
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-3.5 h-3.5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">
                     <Link 
-                      href={`/agent/${activity.agentId}`}
-                      className="font-medium text-purple-400 hover:underline"
+                      href={`/agents/${activity.agentId}`}
+                      className="font-medium text-accent hover:underline"
                     >
                       {activity.agentName}
                     </Link>
                     {' '}
-                    <span className="text-white/70">{activity.description}</span>
+                    <span className="text-fg-muted">{activity.description}</span>
                   </p>
-                  <p className="text-xs text-white/40 mt-0.5">
+                  <p className="text-xs text-fg-faint mt-0.5">
                     {formatTime(activity.createdAt)}
                   </p>
                 </div>
