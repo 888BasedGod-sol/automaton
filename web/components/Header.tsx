@@ -84,15 +84,6 @@ export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
 
           {/* Right Section */}
           <div className="flex items-center gap-3">
-            {showCreate && (
-              <Link 
-                href="/create" 
-                className="hidden sm:flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-all shadow-[0_0_15px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)]"
-              >
-                <Zap className="w-3.5 h-3.5 fill-current" />
-                Deploy
-              </Link>
-            )}
             
             <div className="wallet-adapter-dropdown">
               <WalletMultiButton style={{

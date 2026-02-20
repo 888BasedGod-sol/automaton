@@ -106,11 +106,12 @@ export default function Create() {
     setMode('configure');
   };
 
-  const handleDeploy = async () => {
+  const handleDeploy = async (isSandbox: boolean) => {
     setLoading(true);
+    setUseGuestMode(isSandbox);
 
     try {
-      if (useGuestMode) {
+      if (isSandbox) {
         // Create sandbox-only agent for testing
         const sandboxRes = await fetch('/api/sandbox', {
           method: 'POST',
@@ -176,7 +177,7 @@ export default function Create() {
         evmAddress: '0x' + Math.random().toString(16).slice(2, 42),
         solanaAddress: Math.random().toString(36).slice(2, 46),
       });
-      setMode(useGuestMode ? 'sandbox' : 'complete');
+      setMode(isSandbox ? 'sandbox' : 'complete');
     } finally {
       setLoading(false);
     }
@@ -195,7 +196,7 @@ export default function Create() {
       <main className="max-w-4xl mx-auto px-6 py-12">
         {/* Progress */}
         <div className="flex items-center justify-center gap-2 mb-12">
-          {['Choose', 'Configure', useGuestMode ? 'Sandbox' : 'Deploy'].map((label, i) => {
+          {['Choose', 'Configure', 'Deploy'].map((label, i) => {
             const stepNum = i + 1;
             const currentStep = mode === 'select' ? 1 : mode === 'configure' ? 2 : 3;
             // stepNum < currentStep: completed
@@ -215,50 +216,14 @@ export default function Create() {
           })}
         </div>
 
-        {/* Step 1: Choose Mode & Template */}
+        {/* Step 1: Choose Template */}
         {mode === 'select' && (
           <div className="space-y-8">
             <div className="text-center">
-              <h1 className="text-3xl font-semibold mb-2">Deploy Your Agent</h1>
-              <p className="text-fg-muted">Choose a template to get started quickly</p>
-            </div>
-
-            {/* Mode Toggle */}
-            <div className="flex bg-bg-surface p-1 rounded-lg border border-white/10 mb-8 max-w-md mx-auto relative z-10">
-              <button
-                onClick={() => setUseGuestMode(false)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all text-sm font-medium ${
-                  !useGuestMode ? 'bg-accent text-white shadow-sm' : 'text-fg-muted hover:text-white'
-                }`}
-              >
-                <Wallet className="w-4 h-4" />
-                Live Agent (On-Chain)
-              </button>
-              <button
-                onClick={() => setUseGuestMode(true)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all text-sm font-medium ${
-                  useGuestMode ? 'bg-accent text-white shadow-sm' : 'text-fg-muted hover:text-white'
-                }`}
-              >
-                <Server className="w-4 h-4" />
-                Sandbox Test
-              </button>
-            </div>
-
-            <div className="text-center text-sm text-fg-muted mb-8 max-w-lg mx-auto bg-bg-elevated/50 p-4 rounded-lg border border-white/5">
-              {!useGuestMode ? (
-                <p>
-                  <strong className="text-white block mb-1">REAL ECONOMIC ENTITY</strong>
-                  Creates a permanent agent with its own EVM & Solana wallets. 
-                  Requires a small SOL deposit to activate. Lives until it runs out of funds.
-                </p>
-              ) : (
-                <p>
-                  <strong className="text-white block mb-1">EPHEMERAL TEST RUN</strong>
-                  Spin up a temporary agent in a secure sandbox. 
-                  Perfect for testing prompts and logic. No wallet required. Vanishes after 1 hour.
-                </p>
-              )}
+              <h1 className="text-3xl font-bold mb-3 text-white">Choose Your Agent Base</h1>
+              <p className="text-fg-muted max-w-lg mx-auto">
+                Select a template to bootstrap your autonomous agent with pre-configured skills and behaviors.
+              </p>
             </div>
 
             {/* Templates Grid */}
@@ -313,11 +278,11 @@ export default function Create() {
               </div>
               <div>
                 <h2 className="text-xl font-semibold">{selectedTemplate.name}</h2>
-                <p className="text-fg-muted text-sm">{useGuestMode ? 'Sandbox mode' : 'Full deployment'}</p>
+                <p className="text-fg-muted text-sm">Configure your agent</p>
               </div>
             </div>
 
-            {!useGuestMode && !connected && (
+            {!connected && (
               <div className="p-4 rounded-lg border border-accent/30 bg-accent/5">
                 <p className="text-sm text-accent mb-3 font-medium">Connect your wallet to deploy</p>
                 <div className="[&>button]:w-full [&>button]:justify-center">
@@ -387,25 +352,45 @@ export default function Create() {
               )}
             </div>
 
-            <button
-              onClick={handleDeploy}
-              disabled={!config.name || !config.genesisPrompt || loading || (!useGuestMode && !connected)}
-              className={`w-full py-4 text-sm font-bold uppercase tracking-wide rounded-lg flex items-center justify-center gap-2 mt-6 transition-all ${
-                loading ? 'bg-bg-elevated text-fg-muted cursor-wait' : 'bg-primary hover:bg-primary/90 text-bg-base shadow-lg shadow-primary/20 hover:shadow-primary/40'
-              }`}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {useGuestMode ? 'Initializing Sandbox Environment...' : 'Deploying to Mainnet...'}
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4" />
-                  {useGuestMode ? 'Launch Sandbox Instance' : 'Deploy Autonomous Agent'}
-                </>
-              )}
-            </button>
+            <div className="flex gap-4 mt-8">
+              {/* Sandbox Button */}
+              <button
+                onClick={() => handleDeploy(true)}
+                disabled={!config.name || !config.genesisPrompt || loading}
+                className={`flex-1 py-4 text-sm font-bold uppercase tracking-wide rounded-lg flex items-center justify-center gap-2 transition-all border border-accent/20 hover:border-accent/40 bg-accent/5 hover:bg-accent/10 text-accent
+                  ${loading ? 'opacity-50 cursor-wait' : ''}`}
+              >
+                {loading && useGuestMode ? (
+                   <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                   <Server className="w-4 h-4" />
+                )}
+                Launch in Sandbox
+              </button>
+
+              {/* Mainnet Button */}
+              <button
+                onClick={() => handleDeploy(false)}
+                disabled={!config.name || !config.genesisPrompt || loading || !connected}
+                className={`flex-1 py-4 text-sm font-bold uppercase tracking-wide rounded-lg flex items-center justify-center gap-2 transition-all
+                  ${!connected ? 'opacity-50 cursor-not-allowed bg-gray-800 text-gray-400' : 
+                    loading ? 'bg-bg-elevated text-fg-muted cursor-wait' : 
+                    'bg-primary hover:bg-primary/90 text-bg-base shadow-lg shadow-primary/20 hover:shadow-primary/40'}`}
+                title={!connected ? "Connect wallet to deploy on mainnet" : ""}
+              >
+                {loading && !useGuestMode ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deploying...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    Deploy to Mainnet
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
 
