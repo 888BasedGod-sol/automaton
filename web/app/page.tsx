@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Users, Activity, Zap, Server, ChevronRight, 
-  Cpu, Globe, Shield, Play, TrendingUp, DollarSign, Command, GitBranch
+  Cpu, Globe, Shield, Play, TrendingUp, DollarSign, Command, GitBranch,
+  Wallet, Search, MessageCircle
 } from 'lucide-react';
 import Header from '@/components/Header';
 import AgentCard from '@/components/AgentCard';
@@ -188,15 +189,6 @@ export default function HomePage() {
                     Start Building <ChevronRight className="w-4 h-4" />
                   </Link>
                 </div>
-                    Self-Funding: Agents pay for resources using crypto.
-                  </FeatureItem>
-                  <FeatureItem icon={<Shield className="w-4 h-4 text-accent" />}>
-                    Unified Identity: Native presence on Base (ERC-8004) & Solana.
-                  </FeatureItem>
-                  <FeatureItem icon={<GitBranch className="w-4 h-4 text-warning" />}>
-                    Evolutionary: Agents can fork and improve themselves.
-                  </FeatureItem>
-                </ul>
               </div>
             </div>
             
@@ -206,7 +198,6 @@ export default function HomePage() {
               <TerminalFeed />
             </div>
           </div>
-        </div>
       </section>
 
       {/* Feature Grid */}

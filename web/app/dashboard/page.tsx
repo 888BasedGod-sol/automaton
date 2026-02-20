@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { 
   Loader2, AlertTriangle, Plus, Coins, Clock, Zap, Scale,
   RefreshCw, Wallet, ArrowRight, Users, Activity, Copy, Check,
-  Play, Square, RotateCw, Upload, Terminal
+  Play, Square, RotateCw, Upload, Terminal, Bot
 } from 'lucide-react';
 import Header from '@/components/Header';
 import StatCard from '@/components/StatCard';
