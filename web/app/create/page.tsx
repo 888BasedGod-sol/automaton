@@ -68,7 +68,7 @@ const TEMPLATES: Template[] = [
     name: 'Custom Agent',
     icon: Sparkles,
     color: 'text-accent',
-    description: 'Start from scratch with your own genesis prompt and configuration.',
+    description: 'Start from scratch with your own genesis prompt. No pre-configured skills.',
     genesisPrompt: '',
     skills: [],
   },
@@ -224,33 +224,42 @@ export default function Create() {
             </div>
 
             {/* Mode Toggle */}
-            <div className="flex items-center justify-center gap-4 p-1 bg-bg-surface rounded-lg max-w-md mx-auto border border-border">
+            <div className="flex bg-bg-surface p-1 rounded-lg border border-white/10 mb-8 max-w-md mx-auto relative z-10">
               <button
                 onClick={() => setUseGuestMode(false)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded transition-all text-sm font-medium ${
-                  !useGuestMode ? 'bg-accent text-white shadow-sm' : 'text-fg-muted hover:text-fg'
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all text-sm font-medium ${
+                  !useGuestMode ? 'bg-accent text-white shadow-sm' : 'text-fg-muted hover:text-white'
                 }`}
               >
-                <Wallet className="w-3.5 h-3.5" />
-                Full Deploy
+                <Wallet className="w-4 h-4" />
+                Live Agent (On-Chain)
               </button>
               <button
                 onClick={() => setUseGuestMode(true)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded transition-all text-sm font-medium ${
-                  useGuestMode ? 'bg-accent text-white shadow-sm' : 'text-fg-muted hover:text-fg'
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all text-sm font-medium ${
+                  useGuestMode ? 'bg-accent text-white shadow-sm' : 'text-fg-muted hover:text-white'
                 }`}
               >
-                <Server className="w-3.5 h-3.5" />
-                Try Sandbox
+                <Server className="w-4 h-4" />
+                Sandbox Test
               </button>
             </div>
 
-            {useGuestMode && (
-              <div className="text-center text-xs text-accent bg-accent/10 border border-accent/20 rounded p-3 max-w-md mx-auto flex items-center justify-center gap-2">
-                <Play className="w-3.5 h-3.5" />
-                Sandbox mode lets you test without a wallet. No credit card required.
-              </div>
-            )}
+            <div className="text-center text-sm text-fg-muted mb-8 max-w-lg mx-auto bg-bg-elevated/50 p-4 rounded-lg border border-white/5">
+              {!useGuestMode ? (
+                <p>
+                  <strong className="text-white block mb-1">REAL ECONOMIC ENTITY</strong>
+                  Creates a permanent agent with its own EVM & Solana wallets. 
+                  Requires a small SOL deposit to activate. Lives until it runs out of funds.
+                </p>
+              ) : (
+                <p>
+                  <strong className="text-white block mb-1">EPHEMERAL TEST RUN</strong>
+                  Spin up a temporary agent in a secure sandbox. 
+                  Perfect for testing prompts and logic. No wallet required. Vanishes after 1 hour.
+                </p>
+              )}
+            </div>
 
             {/* Templates Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -317,42 +326,63 @@ export default function Create() {
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-fg-muted mb-1.5">Agent Name</label>
+                <label className="block text-sm font-bold text-white mb-2">Agent Identity</label>
                 <input
                   type="text"
                   value={config.name}
                   onChange={e => setConfig(c => ({ ...c, name: e.target.value }))}
-                  placeholder={`My ${selectedTemplate.name}`}
-                  className="w-full px-4 py-2 bg-bg-surface border border-border rounded text-fg focus:border-accent focus:outline-none transition-colors"
+                  placeholder={`e.g. ${selectedTemplate.name} Beta`}
+                  className="w-full px-4 py-3 bg-bg-surface border border-white/10 rounded-lg text-white focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all placeholder:text-white/20"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-fg-muted mb-1.5">Genesis Prompt</label>
-                <textarea
-                  value={config.genesisPrompt}
-                  onChange={e => setConfig(c => ({ ...c, genesisPrompt: e.target.value }))}
-                  placeholder="Define your agent's purpose and behavior..."
-                  rows={5}
-                  className="w-full px-4 py-3 bg-bg-surface border border-border rounded text-fg focus:border-accent focus:outline-none transition-colors resize-none font-mono text-sm leading-relaxed"
-                />
-                <p className="mt-1.5 text-xs text-fg-muted">
-                  This defines your agent's core identity and autonomous behavior
+                <p className="mt-2 text-xs text-fg-muted">
+                  The public display name for your agent on the registry.
                 </p>
               </div>
 
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-bold text-white">System Prompt (Genesis)</label>
+                  <span className="text-xs px-2 py-0.5 rounded bg-accent/10 text-accent font-mono border border-accent/20">Read-Only Core</span>
+                </div>
+                <div className="relative">
+                  <textarea
+                    value={config.genesisPrompt}
+                    onChange={e => setConfig(c => ({ ...c, genesisPrompt: e.target.value }))}
+                    placeholder="You are an autonomous agent who..."
+                    rows={8}
+                    className="w-full p-4 bg-bg-surface border border-white/10 rounded-lg text-fg-subtle focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all resize-none font-mono text-sm leading-relaxed"
+                  />
+                  <div className="absolute top-2 right-2">
+                     <div className="w-2 h-2 rounded-full bg-accent animate-pulse" title="System Active" />
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-3 text-xs text-fg-muted bg-bg-elevated/30 p-3 rounded border border-white/5">
+                  <Sparkles className="w-4 h-4 text-accent shrink-0" />
+                  <p>
+                    This prompt defines the agent's core personality and constraints. 
+                    It cannot be changed after deployment. It serves as the "constitution" for the agent's behavior.
+                  </p>
+                </div>
+              </div>
+
               {selectedTemplate.skills.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-fg-muted mb-2">Capabilities</label>
-                  <div className="flex flex-wrap gap-2">
+                <div className="pt-4 border-t border-white/5">
+                  <label className="block text-sm font-bold text-white mb-3">Included Capabilities</label>
+                  <div className="grid grid-cols-2 gap-3 mb-2">
                     {selectedTemplate.skills.map(skill => (
-                      <span key={skill} className="px-2.5 py-1 bg-accent/10 border border-accent/20 rounded text-xs text-accent font-medium">
-                        {skill.replace(/_/g, ' ')}
-                      </span>
+                      <div key={skill} className="flex items-center gap-2 px-3 py-2 bg-bg-elevated/50 border border-white/5 rounded-lg">
+                        <div className="w-1.5 h-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(var(--accent),0.5)]" />
+                        <span className="text-xs text-fg-subtle font-mono uppercase tracking-wider">
+                          {skill.replace(/_/g, ' ')}
+                        </span>
+                      </div>
                     ))}
                   </div>
+                  <p className="text-xs text-fg-muted">
+                    * These skills are pre-loaded from the {selectedTemplate.name} template context.
+                  </p>
                 </div>
               )}
             </div>
@@ -360,17 +390,19 @@ export default function Create() {
             <button
               onClick={handleDeploy}
               disabled={!config.name || !config.genesisPrompt || loading || (!useGuestMode && !connected)}
-              className="w-full py-3 btn btn-primary flex items-center justify-center gap-2 mt-4"
+              className={`w-full py-4 text-sm font-bold uppercase tracking-wide rounded-lg flex items-center justify-center gap-2 mt-6 transition-all ${
+                loading ? 'bg-bg-elevated text-fg-muted cursor-wait' : 'bg-primary hover:bg-primary/90 text-bg-base shadow-lg shadow-primary/20 hover:shadow-primary/40'
+              }`}
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {useGuestMode ? 'Creating Sandbox...' : 'Deploying...'}
+                  {useGuestMode ? 'Initializing Sandbox Environment...' : 'Deploying to Mainnet...'}
                 </>
               ) : (
                 <>
                   <Zap className="w-4 h-4" />
-                  {useGuestMode ? 'Launch Sandbox' : 'Deploy Agent'}
+                  {useGuestMode ? 'Launch Sandbox Instance' : 'Deploy Autonomous Agent'}
                 </>
               )}
             </button>

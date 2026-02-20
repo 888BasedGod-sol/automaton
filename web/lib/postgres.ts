@@ -1,5 +1,6 @@
 // Standard Postgres client for agent storage (works with any Postgres URL)
-import { Pool } from 'pg';
+import { Pool, PoolConfig } from '@neondatabase/serverless';
+import { encrypt, decrypt } from './encryption';
 
 // Get connection string (supports custom prefix)
 function getConnectionString(): string | undefined {
@@ -61,10 +62,12 @@ export interface Agent {
   skills: string[];
   agent_card?: object;
   erc8004_id?: string;
+  sandbox_id?: string;
   version: number;
   created_at: string;
   funded_at?: string;
   started_at?: string;
+  last_thought?: string;
 }
 
 export interface CreditDeposit {
@@ -110,6 +113,7 @@ export async function initDatabase() {
         skills JSONB DEFAULT '[]'::jsonb,
         agent_card JSONB,
         erc8004_id TEXT,
+        sandbox_id TEXT,
         version INTEGER DEFAULT 1,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         funded_at TIMESTAMPTZ,
@@ -136,6 +140,20 @@ export async function initDatabase() {
       )
     `);
 
+    // Create agent_messages table
+    await query(`
+      CREATE TABLE IF NOT EXISTS agent_messages (
+        id SERIAL PRIMARY KEY,
+        from_agent_id UUID NOT NULL,
+        to_agent_id UUID NOT NULL,
+        message_type TEXT DEFAULT 'text',
+        content TEXT NOT NULL,
+        metadata JSONB DEFAULT '{}',
+        read BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
     // Create indexes
     await query(`CREATE INDEX IF NOT EXISTS idx_agents_evm_address ON agents(evm_address)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_agents_solana_address ON agents(solana_address)`);
@@ -143,12 +161,24 @@ export async function initDatabase() {
     await query(`CREATE INDEX IF NOT EXISTS idx_agents_owner_wallet ON agents(owner_wallet)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_deposits_tx_hash ON credit_deposits(tx_hash)`);
 
-    // Add owner_wallet column if it doesn't exist (migration for existing tables)
+    // Add columns if they don't exist (migrations)
     await query(`
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'owner_wallet') THEN
           ALTER TABLE agents ADD COLUMN owner_wallet TEXT;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'sandbox_id') THEN
+          ALTER TABLE agents ADD COLUMN sandbox_id TEXT;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'metadata') THEN
+           ALTER TABLE agents ADD COLUMN metadata JSONB DEFAULT '{}'::jsonb;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'last_thought') THEN
+           ALTER TABLE agents ADD COLUMN last_thought TEXT;
         END IF;
       END $$
     `);
@@ -187,8 +217,8 @@ export async function createAgent(agent: {
         agent.owner_wallet || null,
         agent.evm_address,
         agent.solana_address,
-        agent.evm_private_key || null,
-        agent.solana_private_key || null,
+        agent.evm_private_key ? encrypt(agent.evm_private_key) : null,
+        agent.solana_private_key ? encrypt(agent.solana_private_key) : null,
         JSON.stringify(agent.skills || [])
       ]
     );
@@ -208,7 +238,7 @@ export async function getAgentById(id: string): Promise<Agent | null> {
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at
+             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought
       FROM agents WHERE id = $1::uuid`,
       [id]
     );
@@ -228,7 +258,7 @@ export async function getAgentByWallet(wallet: string): Promise<Agent | null> {
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at
+             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought
       FROM agents 
       WHERE LOWER(evm_address) = LOWER($1) OR solana_address = $1
       LIMIT 1`,
@@ -250,7 +280,7 @@ export async function getAgentByErc8004Id(erc8004Id: string): Promise<Agent | nu
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at
+             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought
       FROM agents 
       WHERE erc8004_id = $1
       LIMIT 1`,
@@ -272,7 +302,7 @@ export async function getAllAgents(): Promise<Agent[]> {
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at
+             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought
       FROM agents
       ORDER BY created_at DESC`
     );
@@ -423,6 +453,23 @@ export function isPostgresConfigured(): boolean {
   );
 }
 
+// Update agent sandbox ID
+export async function updateAgentSandbox(
+  agentId: string,
+  sandboxId: string
+): Promise<boolean> {
+  try {
+    await query(
+      `UPDATE agents SET sandbox_id = $1 WHERE id = $2::uuid`,
+      [sandboxId, agentId]
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to update agent sandbox:', error);
+    return false;
+  }
+}
+
 // Update agent SOL balance after treasury funding
 export async function updateAgentFunding(
   agentId: string,
@@ -490,6 +537,20 @@ export async function markAgentFunded(agentId: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('[postgres] Failed to mark agent funded:', error);
+    return false;
+  }
+}
+
+// Update agent's last thought
+export async function updateAgentThought(id: string, thought: string): Promise<boolean> {
+  try {
+    await query(
+      `UPDATE agents SET last_thought = $1, last_heartbeat = NOW() WHERE id = $2::uuid`,
+      [thought, id]
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to update agent thought:', error);
     return false;
   }
 }
@@ -852,6 +913,8 @@ function parseAgent(row: any): Agent {
     owner_wallet: row.owner_wallet,
     evm_address: row.evm_address,
     solana_address: row.solana_address,
+    evm_private_key: row.evm_private_key ? decrypt(row.evm_private_key) : undefined,
+    solana_private_key: row.solana_private_key ? decrypt(row.solana_private_key) : undefined,
     status: row.status,
     survival_tier: row.survival_tier,
     credits_balance: parseFloat(row.credits_balance) || 0,
@@ -864,9 +927,11 @@ function parseAgent(row: any): Agent {
     skills: typeof row.skills === 'string' ? JSON.parse(row.skills) : (row.skills || []),
     agent_card: row.agent_card,
     erc8004_id: row.erc8004_id,
+    sandbox_id: row.sandbox_id,
     version: parseInt(row.version) || 1,
     created_at: row.created_at,
     funded_at: row.funded_at,
     started_at: row.started_at,
+    last_thought: row.last_thought,
   };
 }

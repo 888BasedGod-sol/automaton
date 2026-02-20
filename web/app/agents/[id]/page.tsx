@@ -6,9 +6,11 @@ import Link from 'next/link';
 import { 
   ArrowLeft, Copy, ExternalLink, Activity, Coins, Clock, Shield,
   Zap, AlertTriangle, Scale, CheckCircle, Loader2, RefreshCw, User,
-  Play, Square, RotateCw, Send, Rocket, Terminal
+  Play, Square, RotateCw, Send, Rocket, Terminal as TerminalIcon
 } from 'lucide-react';
 import Header from '@/components/Header';
+import AgentTerminal from '@/components/Terminal';
+import AgentDetailSkeleton from '@/components/AgentDetailSkeleton';
 
 interface Agent {
   id: string;
@@ -63,7 +65,8 @@ export default function AgentDetailPage() {
   }, [agentId]);
 
   const fetchAgent = async () => {
-    setLoading(true);
+    // Only set loading on initial fetch if not already loaded
+    if (!agent) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/agents/${agentId}`);
@@ -111,7 +114,7 @@ export default function AgentDetailPage() {
       if (data.success) {
         setActionMessage(data.message);
         // Refresh agent data
-        fetchAgent();
+        await fetchAgent();
       } else {
         setActionMessage(`Error: ${data.error}`);
       }
@@ -123,12 +126,8 @@ export default function AgentDetailPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-bg-base text-fg flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-accent" />
-      </div>
-    );
+  if (loading && !agent) {
+    return <AgentDetailSkeleton />;
   }
 
   if (error || !agent) {
@@ -233,7 +232,7 @@ export default function AgentDetailPage() {
         {/* Actions Panel */}
         <div className="mb-8 card p-6">
           <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-accent" />
+            <TerminalIcon className="w-5 h-5 text-accent" />
             Control Plane
           </h2>
           
@@ -299,6 +298,18 @@ export default function AgentDetailPage() {
               )}
               <span className="text-xs font-medium uppercase tracking-wide">Deploy</span>
             </button>
+          </div>
+
+          <div className="mt-8 border-t border-white/5 pt-6">
+            <h3 className="text-sm font-medium text-fg-muted mb-3 flex items-center gap-2">
+              <TerminalIcon className="w-4 h-4" />
+              Live Logs
+            </h3>
+            <AgentTerminal 
+              agentId={agent.id} 
+              agentName={agent.name}
+              status={agent.status}
+            />
           </div>
           
           <p className="mt-4 text-xs text-fg-muted flex items-center gap-1.5 opacity-70">

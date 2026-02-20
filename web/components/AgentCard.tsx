@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { 
   Zap, AlertTriangle, Scale, Clock, Activity,
-  Coins, ExternalLink, ChevronRight
+  Coins, ExternalLink, ChevronRight, Terminal
 } from 'lucide-react';
 
 interface Agent {
@@ -18,6 +18,7 @@ interface Agent {
   evm_address?: string;
   uptime_seconds?: number;
   created_at?: string;
+  last_thought?: string;
 }
 
 interface AgentCardProps {
@@ -89,56 +90,90 @@ export default function AgentCard({ agent, variant = 'default' }: AgentCardProps
   return (
     <Link 
       href={`/agents/${agent.id}`}
-      className="block p-4 rounded-lg bg-bg-surface border border-border hover:border-accent/30 transition-colors group"
+      className="block p-5 rounded-xl bg-bg-surface/50 border border-white/5 hover:border-accent/40 hover:bg-bg-surface hover:shadow-[0_0_20px_rgba(139,92,246,0.1)] transition-all duration-300 group backdrop-blur-sm relative overflow-hidden"
     >
+      {/* Decorative Corner */}
+      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-white/5 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
+
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between mb-4 relative z-10">
+        <div className="flex items-center gap-4">
           <div className="relative">
-            <div className="w-10 h-10 rounded-lg bg-bg-elevated flex items-center justify-center font-medium border border-border">
-              {agent.name?.charAt(0) || 'A'}
+            <div className="w-12 h-12 rounded-xl bg-bg-elevated flex items-center justify-center font-bold text-lg border border-white/10 shadow-inner group-hover:border-accent/30 transition-colors">
+              <span className="bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60">
+                {agent.name?.charAt(0) || 'A'}
+              </span>
             </div>
-            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${statusDot} border-2 border-bg-surface`} />
+            <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full ${statusDot} border-[3px] border-bg-surface shadow-sm`}>
+              {agent.status === 'running' && (
+                <div className="absolute inset-0 rounded-full bg-inherit animate-ping opacity-75" />
+              )}
+            </div>
           </div>
           <div>
-            <h3 className="font-medium group-hover:text-accent transition-colors">
+            <h3 className="font-semibold text-white group-hover:text-accent transition-colors flex items-center gap-2">
               {agent.name}
+              <ChevronRight className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-accent" />
             </h3>
-            <p className="text-xs text-fg-faint font-mono">
-              {agent.id.slice(0, 8)}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-fg-muted font-mono bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                ID: {agent.id.slice(0, 6)}
+              </span>
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm ${tier.bg} ${tier.color} border border-current/20`}>
+                {agent.survival_tier}
+              </span>
+            </div>
           </div>
-        </div>
-        
-        <div className={`px-2 py-0.5 rounded text-xs font-medium ${tier.bg} ${tier.color} flex items-center gap-1`}>
-          <TierIcon className="w-3 h-3" />
-          {agent.survival_tier}
         </div>
       </div>
 
-      {/* Description */}
-      {agent.genesis_prompt && (
-        <p className="text-sm text-fg-muted line-clamp-2 mb-3">
-          {agent.genesis_prompt}
+      {/* Terminal Thought Snippet */}
+      <div className="mb-4 bg-black/40 rounded-lg p-3 border border-white/5 font-mono text-xs text-green-400/90 overflow-hidden relative group-hover:border-green-500/20 transition-colors">
+        <div className="flex items-center gap-2 mb-1.5 opacity-50 text-[10px] uppercase tracking-widest text-green-500">
+          <Terminal className="w-3 h-3" />
+          Last Output
+        </div>
+        <p className="line-clamp-2 leading-relaxed opacity-90">
+          {agent.last_thought || `> System check complete. Maintaining optimal uptime (${formatUptime(agent.uptime_seconds)}). Awaiting instructions...`}
         </p>
-      )}
+        <div className="absolute bottom-0 right-0 p-1">
+           <div className="w-1.5 h-1.5 bg-green-500 animate-pulse" />
+        </div>
+      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-2 text-xs">
-        <div className="p-2 rounded bg-bg-base">
-          <div className="text-fg-faint mb-0.5">Credits</div>
-          <div className={credits > 0 ? 'text-success font-medium' : 'text-fg-muted'}>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="p-2.5 rounded-lg bg-bg-elevated/50 border border-white/5 group-hover:bg-bg-elevated transition-colors">
+          <div className="text-xs text-fg-muted mb-1 flex items-center gap-1.5">
+            <Coins className="w-3.5 h-3.5" /> Balance
+          </div>
+          <div className={`font-mono font-medium ${credits > 0 ? 'text-white' : 'text-fg-muted'}`}>
             ${credits.toFixed(2)}
           </div>
         </div>
-        <div className="p-2 rounded bg-bg-base">
-          <div className="text-fg-faint mb-0.5">Status</div>
-          <div className="font-medium capitalize">{agent.status}</div>
+        <div className="p-2.5 rounded-lg bg-bg-elevated/50 border border-white/5 group-hover:bg-bg-elevated transition-colors">
+          <div className="text-xs text-fg-muted mb-1 flex items-center gap-1.5">
+            <Activity className="w-3.5 h-3.5" /> Uptime
+          </div>
+          <div className="font-mono font-medium text-white">
+            {formatUptime(agent.uptime_seconds)}
+          </div>
         </div>
-        <div className="p-2 rounded bg-bg-base">
-          <div className="text-fg-faint mb-0.5">Uptime</div>
-          <div className="font-medium">{formatUptime(agent.uptime_seconds)}</div>
+      </div>
+
+      {/* Chain Identifiers */}
+      <div className="flex items-center justify-between text-[10px] font-mono text-fg-faint pt-3 border-t border-white/5">
+        <div className="flex gap-2">
+          <span className="flex items-center gap-1.5">
+            <span className="w-1 h-1 rounded-full bg-blue-500" /> BASE
+          </span>
+          {agent.solana_address && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-purple-500" /> SOLANA
+            </span>
+          )}
         </div>
+        <span className="group-hover:text-accent transition-colors">v1.2.0</span>
       </div>
     </Link>
   );

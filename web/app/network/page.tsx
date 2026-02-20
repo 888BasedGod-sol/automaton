@@ -6,9 +6,10 @@ import Link from 'next/link';
 import { 
   Network, Zap, AlertTriangle, Scale, Clock, 
   ZoomIn, ZoomOut, Maximize2, Info, X, ExternalLink,
-  GitFork, Users, Activity, BarChart2
+  GitFork, Users, Activity, BarChart2, Cpu, Database
 } from 'lucide-react';
 import Header from '@/components/Header';
+import NetworkBackground from '@/components/NetworkBackground';
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { 
   ssr: false,
@@ -74,23 +75,63 @@ export default function NetworkPage() {
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; links: GraphLink[] }>({ nodes: [], links: [] });
-  const [stats, setStats] = useState({ tps: 0, activeConnections: 0 });
+  const [trafficData, setTrafficData] = useState<any[]>([]);
+  const [randomLinks, setRandomLinks] = useState<string[][]>([]);
+  const [stats, setStats] = useState({ 
+    activeAgents: 0, 
+    totalTransactions: 0, 
+    networkValue: 0 
+  });
   const graphRef = useRef<any>(null);
 
-  // Simulate real-time data
+  // Poll for real network traffic & stats
   useEffect(() => {
-    const interval = setInterval(() => {
-      setStats({
-        tps: Math.floor(Math.random() * 50) + 120,
-        activeConnections: Math.floor(Math.random() * 10) + graphData.links.length,
-      });
-    }, 2000);
+    const fetchTraffic = async () => {
+      try {
+        const res = await fetch('/api/network/traffic');
+        const data = await res.json();
+        if (data.traffic && Array.isArray(data.traffic)) {
+          setTrafficData(data.traffic);
+        }
+        if (data.stats) {
+          setStats(data.stats);
+        }
+      } catch (e) {
+        console.error("Traffic fetch error", e);
+      }
+    };
+    
+    fetchTraffic();
+    const interval = setInterval(fetchTraffic, 5000);
     return () => clearInterval(interval);
-  }, [graphData.links.length]);
+  }, []);
 
   useEffect(() => {
     fetchAgents();
   }, []);
+
+  useEffect(() => {
+    if (agents.length > 0 && randomLinks.length === 0) {
+       const links: string[][] = [];
+       if (agents.length > 5) {
+         for (let i = 0; i < agents.length; i++) {
+           if (Math.random() > 0.7) {
+             const targetIndex = Math.floor(Math.random() * agents.length);
+             if (agents[i].id !== agents[targetIndex].id) {
+                links.push([agents[i].id, agents[targetIndex].id]);
+             }
+           }
+         }
+       }
+       setRandomLinks(links);
+    }
+  }, [agents]);
+
+  useEffect(() => {
+    if (agents.length > 0) {
+      buildGraph(agents, trafficData);
+    }
+  }, [agents, trafficData, randomLinks]);
 
   const fetchAgents = async () => {
     try {
@@ -98,7 +139,6 @@ export default function NetworkPage() {
       const data = await res.json();
       const agentList = data.agents || [];
       setAgents(agentList);
-      buildGraph(agentList);
     } catch (e) {
       console.error(e);
     } finally {
@@ -106,7 +146,7 @@ export default function NetworkPage() {
     }
   };
 
-  const buildGraph = (agentList: Agent[]) => {
+  const buildGraph = (agentList: Agent[], currentTraffic: any[] = []) => {
     const nodes: GraphNode[] = agentList.map(agent => ({
       id: agent.id,
       name: agent.name,
@@ -119,8 +159,9 @@ export default function NetworkPage() {
     }));
 
     const links: GraphLink[] = [];
-    
-    // Create heavy links for parent-child
+    const linkSet = new Set<string>();
+
+    // 1. Structural Links (Parent-Child)
     agentList.forEach(agent => {
       if (agent.parent_id && agentList.some(a => a.id === agent.parent_id)) {
         links.push({
@@ -128,23 +169,56 @@ export default function NetworkPage() {
           target: agent.id,
           type: 'fork',
         });
+        linkSet.add(`${agent.parent_id}-${agent.id}`);
       }
     });
 
-    // Add random "communication" links for visual density (simulated peering)
-    if (nodes.length > 5) {
-      for (let i = 0; i < nodes.length; i++) {
-        if (Math.random() > 0.7) {
-          const targetIndex = Math.floor(Math.random() * nodes.length);
-          if (targetIndex !== i) {
-             links.push({
-               source: nodes[i].id,
-               target: nodes[targetIndex].id,
-               type: 'peer',
-             });
-          }
-        }
-      }
+    // 2. Traffic Links (Real Communication - High Priority)
+    currentTraffic.forEach((t: any) => {
+       const sourceId = t.source;
+       const targetId = t.target;
+       
+       const sNode = nodes.find(n => n.id === sourceId);
+       const tNode = nodes.find(n => n.id === targetId);
+
+       if (sNode && tNode) {
+          // If connection doesn't exist, create it as traffic type
+          if (!linkSet.has(`${sourceId}-${targetId}`) && !linkSet.has(`${targetId}-${sourceId}`)) {
+            links.push({
+              source: sourceId,
+              target: targetId,
+              type: 'traffic'
+            });
+            linkSet.add(`${sourceId}-${targetId}`);
+            linkSet.add(`${targetId}-${sourceId}`);
+          } 
+          // If it DOES exist (e.g. fork), we ideally update it to be active
+          // But strict graph updates are tricky. 
+          // For now, let's assume traffic overrides
+       }
+    });
+
+    // 3. Simulated Random Links (Static set)
+    if (randomLinks && randomLinks.length > 0) {
+      randomLinks.forEach((pair) => {
+         const src = pair[0];
+         const tgt = pair[1];
+         
+         const sNode = nodes.find(n => n.id === src);
+         const tNode = nodes.find(n => n.id === tgt);
+         
+         if (sNode && tNode && !linkSet.has(`${src}-${tgt}`) && !linkSet.has(`${tgt}-${src}`)) {
+            links.push({
+              source: src,
+              target: tgt,
+              type: 'peer'
+            });
+             linkSet.add(`${src}-${tgt}`);
+             linkSet.add(`${tgt}-${src}`);
+         }
+      });
+    } else if (nodes.length > 5) {
+      // Fallback if randomLinks not ready
     }
 
     setGraphData({ nodes, links });
@@ -194,16 +268,13 @@ export default function NetworkPage() {
       </div>
 
       <main className="flex-1 relative bg-[#050505]">
-        {/* Subtle grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
-             style={{ 
-               backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)', 
-               backgroundSize: '40px 40px' 
-             }} 
-        />
+        {/* Immersive Background */}
+        <div className="absolute inset-0 z-0">
+           <NetworkBackground />
+        </div>
         
         {/* Graph Container */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-10">
           {!loading && (
             <ForceGraph2D
               ref={graphRef}
@@ -211,95 +282,178 @@ export default function NetworkPage() {
               nodeLabel="name"
               nodeColor="color"
               nodeRelSize={6}
-              linkColor={(link: any) => link.type === 'fork' ? '#52525b' : '#27272a'}
-              linkWidth={(link: any) => link.type === 'fork' ? 2 : 1}
-              linkDirectionalParticles={2}
-              linkDirectionalParticleSpeed={0.005}
-              linkDirectionalParticleWidth={2}
+              linkColor={(link: any) => {
+                if (link.type === 'traffic') return '#8b5cf6'; // Violet for active traffic
+                if (link.type === 'fork') return '#52525b';
+                return '#27272a';
+              }}
+              linkWidth={(link: any) => {
+                if (link.type === 'traffic') return 2;
+                if (link.type === 'fork') return 2;
+                return 1;
+              }}
+              linkDirectionalParticles={(link: any) => {
+                if (link.type === 'traffic') return 4;
+                if (link.type === 'fork') return 0;
+                return 1; // slow passive traffic on peer links
+              }}
+              linkDirectionalParticleSpeed={(link: any) => {
+                if (link.type === 'traffic') return 0.01;
+                return 0.002;
+              }}
+              linkDirectionalParticleWidth={(link: any) => link.type === 'traffic' ? 4 : 2}
               linkDirectionalParticleColor={() => '#8b5cf6'} // accent color particles
-              backgroundColor="rgba(0,0,0,0)" // Transparent to show grid
+              backgroundColor="rgba(0,0,0,0)" // Transparent to show background
               onNodeClick={handleNodeClick}
               nodeCanvasObject={(node: any, ctx, globalScale) => {
                 const label = node.name;
                 const fontSize = 12 / globalScale;
                 const radius = node.val / 2;
+                const isActive = node.status === 'running' || node.status === 'active';
+                const isThriving = node.tier === 'thriving';
                 
-                // Draw node circle
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+                // Helper to draw hex
+                const drawHex = (x: number, y: number, r: number) => {
+                  ctx.beginPath();
+                  for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i - (Math.PI / 6); // Rotate 30deg for flat top
+                    const px = x + r * Math.cos(angle);
+                    const py = y + r * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                  }
+                  ctx.closePath();
+                };
+
+                // Glow Effect
+                const glowSize = isActive ? 15 : 5;
+                ctx.shadowColor = node.color;
+                ctx.shadowBlur = glowSize;
+                
+                // Main Shape (Hex for active/thriving, Circle for others)
                 ctx.fillStyle = node.color;
-                ctx.fill();
+                if (isActive || isThriving) {
+                  drawHex(node.x, node.y, radius);
+                  ctx.fill();
+                } else {
+                  ctx.beginPath();
+                  ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+                  ctx.fill();
+                }
+                
+                // Reset shadow for crisp lines
+                ctx.shadowBlur = 0;
                 
                 // Active Pulse effect for running agents
-                if (node.status === 'running' || node.status === 'active') {
+                if (isActive) {
                   const time = Date.now() / 1000;
                   const pulseRadius = radius + (Math.sin(time * 3) + 1) * 2;
-                  ctx.beginPath();
-                  ctx.arc(node.x, node.y, pulseRadius, 0, 2 * Math.PI);
-                  ctx.strokeStyle = `${node.color}40`; // Low opacity
-                  ctx.lineWidth = 2 / globalScale;
+                  ctx.strokeStyle = `${node.color}60`; // Low opacity
+                  ctx.lineWidth = 1 / globalScale;
+                  drawHex(node.x, node.y, pulseRadius);
                   ctx.stroke();
+
+                  // Tech Ring rotating
+                  ctx.save();
+                  ctx.translate(node.x, node.y);
+                  ctx.rotate(time);
+                  ctx.strokeStyle = `${node.color}AA`;
+                  ctx.lineWidth = 1.5 / globalScale;
+                  ctx.beginPath();
+                  ctx.arc(0, 0, radius * 1.4, 0, Math.PI); // Half circle ring
+                  ctx.stroke();
+                  
+                  // Second ring opposite
+                  ctx.rotate(Math.PI);
+                  ctx.strokeStyle = `${node.color}55`;
+                  ctx.beginPath();
+                  ctx.arc(0, 0, radius * 1.6, 0, Math.PI * 0.5);
+                  ctx.stroke();
+                  
+                  ctx.restore();
                 }
 
-                // Inner highlight
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, radius * 0.7, 0, 2 * Math.PI);
-                ctx.fillStyle = 'rgba(255,255,255,0.1)';
-                ctx.fill();
+                // Inner highlight / Core
+                ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                if (isActive || isThriving) {
+                   drawHex(node.x, node.y, radius * 0.7);
+                   ctx.fill();
+                } else {
+                   ctx.beginPath();
+                   ctx.arc(node.x, node.y, radius * 0.6, 0, 2 * Math.PI);
+                   ctx.fill();
+                }
                 
                 // Border
-                ctx.strokeStyle = '#09090b'; 
-                ctx.lineWidth = 2 / globalScale;
-                ctx.stroke();
+                ctx.strokeStyle = '#000'; 
+                ctx.lineWidth = 1 / globalScale;
+                if (isActive || isThriving) {
+                   drawHex(node.x, node.y, radius);
+                   ctx.stroke();
+                } else {
+                   ctx.stroke();
+                }
                 
                 // Label
-                if (globalScale > 0.8) {
+                if (globalScale > 0.9 || isActive) {
                   ctx.font = `${fontSize}px JetBrains Mono, monospace`;
                   ctx.textAlign = 'center';
                   ctx.textBaseline = 'top';
                   
                   // Text background for readability
                   const textWidth = ctx.measureText(label).width;
-                  ctx.fillStyle = 'rgba(0,0,0,0.7)';
-                  ctx.fillRect(node.x - textWidth/2 - 2, node.y + radius + 4, textWidth + 4, fontSize + 4);
+                  const bgPad = 4;
+                  ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                  // Rounded rect background for text
+                  ctx.fillRect(node.x - textWidth/2 - bgPad, node.y + radius + 6, textWidth + bgPad*2, fontSize + bgPad);
                   
-                  ctx.fillStyle = '#e4e4e7'; // fg
-                  ctx.fillText(label, node.x, node.y + radius + 6);
+                  ctx.fillStyle = isActive ? '#fff' : '#aaa';
+                  ctx.fillText(label, node.x, node.y + radius + 8);
                 }
               }}
-              // Simulation physics tweaks for stability
-              cooldownTicks={100}
-              d3AlphaDecay={0.02}
-              d3VelocityDecay={0.4}
-              warmupTicks={50}
+              // Simulation physics tweaks for continuous movement
+              cooldownTicks={100000}
+              d3AlphaDecay={0.01}
+              d3VelocityDecay={0.3}
+              warmupTicks={10}
             />
           )}
         </div>
 
         {/* Live Status Overlay - HUD Style */}
-        <div className="absolute top-20 left-6 z-20 pointer-events-none">
+        <div className="absolute top-24 left-6 z-20 pointer-events-none">
           <div className="flex flex-col gap-4">
-            <div className="bg-black/40 backdrop-blur-sm border border-white/10 p-4 rounded-lg w-64">
-              <div className="flex items-center gap-2 mb-3 text-xs font-mono text-accent uppercase tracking-widest">
-                <Activity className="w-3 h-3" />
-                Network Status :: Online
+            <div className="bg-black/60 backdrop-blur-md border border-white/10 p-4 rounded-lg w-72 shadow-2xl">
+              <div className="flex items-center gap-2 mb-4 text-xs font-mono text-accent uppercase tracking-widest border-b border-white/5 pb-2">
+                <Activity className="w-3 h-3 animate-pulse" />
+                Network Metrics :: Live
               </div>
-              <div className="space-y-3">
-                 <div className="flex items-center justify-between">
-                   <span className="text-xs text-fg-muted font-mono">TPS (Est)</span>
-                   <span className="text-sm font-mono text-white tabular-nums">{stats.tps}</span>
+              <div className="space-y-4">
+                 <div>
+                   <div className="flex items-end justify-between mb-1">
+                     <span className="text-xs text-fg-muted font-mono uppercase tracking-wider">Active Entities</span>
+                     <span className="text-xl font-mono text-white tabular-nums font-bold">{stats.activeAgents}</span>
+                   </div>
+                   <div className="w-full bg-white/5 h-1 rounded overflow-hidden">
+                     <div className="h-full bg-success shadow-[0_0_10px_rgba(34,197,94,0.5)] transition-all duration-1000" style={{ width: `${Math.min(100, (stats.activeAgents / 50) * 100)}%` }} />
+                   </div>
                  </div>
-                 <div className="w-full bg-bg-elevated h-1 rounded overflow-hidden">
-                   <div className="h-full bg-accent animate-pulse" style={{ width: `${Math.min(100, stats.tps / 2)}%` }} />
+
+                 <div>
+                   <div className="flex items-end justify-between mb-1">
+                     <span className="text-xs text-fg-muted font-mono uppercase tracking-wider">Global Transactions</span>
+                     <span className="text-xl font-mono text-accent tabular-nums font-bold">{stats.totalTransactions.toLocaleString()}</span>
+                   </div>
+                   <div className="w-full bg-white/5 h-1 rounded overflow-hidden">
+                      <div className="h-full bg-accent shadow-[0_0_10px_rgba(139,92,246,0.5)] transition-all duration-1000" style={{ width: '100%' }} />
+                   </div>
                  </div>
                  
-                 <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                   <span className="text-xs text-fg-muted font-mono">Active Nodes</span>
-                   <span className="text-sm font-mono text-success tabular-nums">{agents.filter(a => a.status === 'running').length}</span>
-                 </div>
-                 <div className="flex items-center justify-between">
-                   <span className="text-xs text-fg-muted font-mono">Total Stake</span>
-                   <span className="text-sm font-mono text-white tabular-nums">${agents.reduce((acc, a) => acc + (a.credits_balance || 0), 0).toFixed(0)}</span>
+                 <div className="pt-3 border-t border-white/5">
+                   <div className="flex items-end justify-between">
+                     <span className="text-xs text-fg-muted font-mono uppercase tracking-wider">Network Value (TVL)</span>
+                     <span className="text-xl font-mono text-white tabular-nums font-bold">${stats.networkValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                   </div>
                  </div>
               </div>
             </div>

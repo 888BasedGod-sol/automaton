@@ -3,11 +3,8 @@
 import { FC, ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 
-// Dynamically import WalletProvider to avoid SSR issues
-const WalletProvider = dynamic(
-  () => import('./WalletProvider'),
-  { ssr: false }
-);
+const WalletProvider = dynamic(() => import('./WalletProvider'), { ssr: false });
+const EvmProvider = dynamic(() => import('./EvmProvider').then(mod => mod.EvmProvider), { ssr: false });
 
 interface ProvidersProps {
   children: ReactNode;
@@ -15,9 +12,11 @@ interface ProvidersProps {
 
 export const Providers: FC<ProvidersProps> = ({ children }) => {
   return (
-    <WalletProvider>
-      {children}
-    </WalletProvider>
+    <EvmProvider>
+      <WalletProvider>
+        {children}
+      </WalletProvider>
+    </EvmProvider>
   );
 };
 

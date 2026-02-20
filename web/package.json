@@ -22,6 +22,7 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
     "@prisma/client": "^7.4.0",
+    "@rainbow-me/rainbowkit": "^2.2.10",
     "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
@@ -30,6 +31,7 @@
     "@solana/web3.js": "^1.98.4",
     "@supabase/supabase-js": "^2.97.0",
     "@tailwindcss/postcss": "^4.1.18",
+    "@tanstack/react-query": "^5.54.1",
     "@types/node": "^25.2.3",
     "@types/pg": "^8.16.0",
     "@types/react": "^19.2.14",
@@ -50,7 +52,8 @@
     "tweetnacl": "^1.0.3",
     "typescript": "^5.9.3",
     "uuid": "^13.0.0",
-    "viem": "^2.46.2"
+    "viem": "^2.46.2",
+    "wagmi": "^2.19.5"
   },
   "devDependencies": {
     "@types/uuid": "^10.0.0",

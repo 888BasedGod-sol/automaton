@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import { query } from '@/lib/postgres';
 
-const getDb = () => neon(process.env.DATABASE_URL!);
+export const dynamic = 'force-dynamic';
 
 // GET - Fetch messages for an agent
 export async function GET(request: NextRequest) {
@@ -14,60 +14,43 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Create messages table if not exists
-    await getDb()`
-      CREATE TABLE IF NOT EXISTS agent_messages (
-        id SERIAL PRIMARY KEY,
-        from_agent_id TEXT NOT NULL,
-        to_agent_id TEXT NOT NULL,
-        message_type TEXT DEFAULT 'text',
-        content TEXT NOT NULL,
-        metadata JSONB DEFAULT '{}',
-        read BOOLEAN DEFAULT false,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `;
-    
-    await getDb()`CREATE INDEX IF NOT EXISTS idx_messages_to ON agent_messages(to_agent_id)`;
-    await getDb()`CREATE INDEX IF NOT EXISTS idx_messages_from ON agent_messages(from_agent_id)`;
-
-    let messages;
+    let result;
     if (since) {
-      messages = await getDb()`
+      result = await query(`
         SELECT m.*, 
                f.name as from_name,
                t.name as to_name
         FROM agent_messages m
-        LEFT JOIN agents f ON m.from_agent_id = f.id
-        LEFT JOIN agents t ON m.to_agent_id = t.id
-        WHERE (m.to_agent_id = ${agentId} OR m.from_agent_id = ${agentId})
-          AND m.created_at > ${since}::timestamp
+        LEFT JOIN agents f ON m.from_agent_id::text = f.id::text
+        LEFT JOIN agents t ON m.to_agent_id::text = t.id::text
+        WHERE (m.to_agent_id::text = $1 OR m.from_agent_id::text = $1)
+          AND m.created_at > $2::timestamp
         ORDER BY m.created_at DESC
-        LIMIT ${limit}
-      `;
+        LIMIT $3
+      `, [agentId, since, limit]);
     } else {
-      messages = await getDb()`
+      result = await query(`
         SELECT m.*, 
                f.name as from_name,
                t.name as to_name
         FROM agent_messages m
-        LEFT JOIN agents f ON m.from_agent_id = f.id
-        LEFT JOIN agents t ON m.to_agent_id = t.id
-        WHERE m.to_agent_id = ${agentId} OR m.from_agent_id = ${agentId}
+        LEFT JOIN agents f ON m.from_agent_id::text = f.id::text
+        LEFT JOIN agents t ON m.to_agent_id::text = t.id::text
+        WHERE (m.to_agent_id::text = $1 OR m.from_agent_id::text = $1)
         ORDER BY m.created_at DESC
-        LIMIT ${limit}
-      `;
+        LIMIT $2
+      `, [agentId, limit]);
     }
 
     // Get unread count
-    const unreadResult = await getDb()`
+    const unreadResult = await query(`
       SELECT COUNT(*) as count FROM agent_messages 
-      WHERE to_agent_id = ${agentId} AND read = false
-    `;
+      WHERE to_agent_id::text = $1 AND read = false
+    `, [agentId]);
 
     return NextResponse.json({
-      messages,
-      unreadCount: parseInt(unreadResult[0]?.count || '0'),
+      messages: result.rows,
+      unreadCount: parseInt(unreadResult.rows[0]?.count || '0'),
     });
   } catch (error) {
     console.error('Error fetching messages:', error);
@@ -87,32 +70,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify both agents exist
-    const agents = await getDb()`
-      SELECT id, name, status FROM agents 
-      WHERE id IN (${fromAgentId}, ${toAgentId})
-    `;
-
-    if (agents.length < 2) {
-      return NextResponse.json({ error: 'One or both agents not found' }, { status: 404 });
-    }
-
     // Insert message
-    const result = await getDb()`
+    const result = await query(`
       INSERT INTO agent_messages (from_agent_id, to_agent_id, content, message_type, metadata)
-      VALUES (${fromAgentId}, ${toAgentId}, ${content}, ${messageType}, ${JSON.stringify(metadata)})
+      VALUES ($1::uuid, $2::uuid, $3, $4, $5)
       RETURNING *
-    `;
-
-    // Log activity
-    await getDb()`
-      INSERT INTO activity (agent_id, type, detail)
-      VALUES (${fromAgentId}, 'message_sent', ${`Sent message to agent`})
-    `;
+    `, [fromAgentId, toAgentId, content, messageType, JSON.stringify(metadata)]);
 
     return NextResponse.json({
       success: true,
-      message: result[0],
+      message: result.rows[0],
     });
   } catch (error) {
     console.error('Error sending message:', error);
@@ -131,18 +98,18 @@ export async function PATCH(request: NextRequest) {
 
     if (messageIds && messageIds.length > 0) {
       // Mark specific messages as read
-      await getDb()`
+      await query(`
         UPDATE agent_messages 
         SET read = true 
-        WHERE id = ANY(${messageIds}) AND to_agent_id = ${agentId}
-      `;
+        WHERE id = ANY($1) AND to_agent_id::text = $2
+      `, [messageIds, agentId]);
     } else {
       // Mark all as read
-      await getDb()`
+      await query(`
         UPDATE agent_messages 
         SET read = true 
-        WHERE to_agent_id = ${agentId} AND read = false
-      `;
+        WHERE to_agent_id::text = $1 AND read = false
+      `, [agentId]);
     }
 
     return NextResponse.json({ success: true });

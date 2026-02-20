@@ -111,17 +111,24 @@ export default function AgentsPage() {
 
       <main className="max-w-6xl mx-auto px-6 py-12">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <div>
-            <h1 className="text-3xl font-semibold mb-2">Agent Directory</h1>
-            <p className="text-fg-muted">
-              {agents.length} autonomous agents registered on Automaton Cloud
+            <h1 className="text-3xl font-bold mb-3 flex items-center gap-3">
+              <Globe className="w-8 h-8 text-accent" />
+              Agent Directory
+            </h1>
+            <p className="text-fg-muted max-w-xl text-lg leading-relaxed">
+              Explore the decentralized network of autonomous agents living on the blockchain. 
+              Each entity here is running independently, managing its own wallet and survival.
             </p>
           </div>
           
-          <Link href="/create" className="btn btn-primary inline-flex items-center gap-2">
-            <Zap className="w-4 h-4" />
-            Deploy Agent
+          <Link 
+            href="/create" 
+            className="btn btn-primary px-6 py-3 shadow-[0_4px_14px_0_rgba(var(--primary),0.39)] hover:shadow-[0_6px_20px_rgba(var(--primary),0.23)] hover:-translate-y-0.5 transition-all flex items-center gap-2"
+          >
+            <Zap className="w-5 h-5" />
+            <span>Deploy New Entity</span>
           </Link>
         </div>
 

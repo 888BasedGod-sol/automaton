@@ -221,17 +221,20 @@ export default function Dashboard() {
 
             {/* No Agents */}
             {!loading && !error && agents.length === 0 && (
-              <div className="text-center py-24 card border-dashed">
-                <div className="w-16 h-16 rounded bg-bg-elevated flex items-center justify-center mx-auto mb-4">
-                  <Plus className="w-8 h-8 text-fg-muted" />
+              <div className="text-center py-20 border border-dashed border-white/10 rounded-xl bg-bg-surface/30">
+                <div className="w-16 h-16 rounded-full bg-bg-elevated flex items-center justify-center mx-auto mb-6 shadow-inner ring-1 ring-white/5">
+                  <Bot className="w-8 h-8 text-fg-muted" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">No agents yet</h3>
-                <p className="text-fg-muted mb-6 text-sm">Deploy your first autonomous agent to get started</p>
+                <h3 className="text-xl font-medium text-white mb-2">Your Fleet is Empty</h3>
+                <p className="text-fg-muted mb-8 max-w-sm mx-auto">
+                  Deploy autonomous agents to run 24/7. They will manage their own wallet and execute tasks on your behalf.
+                </p>
                 <Link
                   href="/create"
-                  className="btn btn-primary inline-flex items-center gap-2"
+                  className="btn btn-primary px-8 py-3 dark:shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary),0.5)] transition-all"
                 >
-                  Deploy First Agent <ArrowRight className="w-4 h-4" />
+                  <Plus className="w-4 h-4 mr-2" />
+                  Launch New Agent
                 </Link>
               </div>
             )}

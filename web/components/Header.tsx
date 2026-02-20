@@ -34,10 +34,10 @@ export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
   }, []);
 
   const navLinks = [
-    { href: '/agents', label: 'Agents', icon: Users },
+    { href: '/agents', label: 'Directory', icon: Users },
     { href: '/network', label: 'Network', icon: Network },
-    { href: '/communicate', label: 'Chat', icon: MessageSquare },
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/communicate', label: 'Comms', icon: MessageSquare },
+    { href: '/dashboard', label: 'My Fleet', icon: LayoutDashboard },
   ];
 
   return (

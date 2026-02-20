@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import { query } from '@/lib/postgres';
 
-const getDb = () => neon(process.env.DATABASE_URL!);
+export const dynamic = 'force-dynamic';
 
 // GET - Discover agents available for communication
 export async function GET(request: NextRequest) {
@@ -12,48 +12,50 @@ export async function GET(request: NextRequest) {
   const limit = parseInt(request.nextUrl.searchParams.get('limit') || '20');
 
   try {
-    // Build dynamic query
-    let agents;
-    
-    if (skill) {
-      agents = await getDb()`
-        SELECT 
-          id, name, genesis_prompt, status, survival_tier,
-          solana_address, evm_address, skills,
-          created_at, uptime_seconds
-        FROM agents 
-        WHERE status = ${status}
-          AND (${excludeId}::text IS NULL OR id != ${excludeId})
-          AND (${tier}::text IS NULL OR survival_tier = ${tier})
-          AND skills::text ILIKE ${'%' + skill + '%'}
-        ORDER BY credits_balance DESC
-        LIMIT ${limit}
-      `;
-    } else {
-      agents = await getDb()`
-        SELECT 
-          id, name, genesis_prompt, status, survival_tier,
-          solana_address, evm_address, skills,
-          created_at, uptime_seconds
-        FROM agents 
-        WHERE status = ${status}
-          AND (${excludeId}::text IS NULL OR id != ${excludeId})
-          AND (${tier}::text IS NULL OR survival_tier = ${tier})
-        ORDER BY credits_balance DESC
-        LIMIT ${limit}
-      `;
+    // Basic query
+    let sql = `
+      SELECT 
+        id, name, genesis_prompt, status, survival_tier,
+        solana_address, evm_address, skills,
+        created_at, uptime_seconds
+      FROM agents 
+      WHERE status = $1
+    `;
+    const params: any[] = [status];
+
+    // Dynamic filters
+    if (excludeId) {
+      sql += ` AND id::text != $${params.length + 1}`;
+      params.push(excludeId);
     }
 
+    if (tier) {
+      sql += ` AND survival_tier = $${params.length + 1}`;
+      params.push(tier);
+    }
+
+    if (skill) {
+      // JSONB array containing skill? Or text search?
+      // Original code used ILIKE on skills::text
+      sql += ` AND skills::text ILIKE $${params.length + 1}`;
+      params.push(`%${skill}%`);
+    }
+
+    sql += ` ORDER BY credits_balance DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
+
+    const result = await query(sql, params);
+
     // Get stats
-    const stats = await getDb()`
+    const statsResult = await query(`
       SELECT 
         COUNT(*) FILTER (WHERE status = 'running') as online_count,
         COUNT(*) as total_count
       FROM agents
-    `;
+    `);
 
     return NextResponse.json({
-      agents: agents.map(a => ({
+      agents: result.rows.map((a: any) => ({
         id: a.id,
         name: a.name,
         description: a.genesis_prompt?.slice(0, 200),
@@ -64,13 +66,13 @@ export async function GET(request: NextRequest) {
         uptime: a.uptime_seconds,
       })),
       stats: {
-        online: parseInt(stats[0]?.online_count || '0'),
-        total: parseInt(stats[0]?.total_count || '0'),
+        online: parseInt(statsResult.rows[0]?.online_count || '0'),
+        total: parseInt(statsResult.rows[0]?.total_count || '0'),
       }
     });
   } catch (error) {
     console.error('Error discovering agents:', error);
-    return NextResponse.json({ error: 'Failed to discover agents' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to discover agents', details: String(error) }, { status: 500 });
   }
 }
 
@@ -84,13 +86,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Update agent's discoverable status and capabilities
-    await getDb()`
+    // Assuming 'metadata' column exists (added in recent migration)
+    await query(`
       UPDATE agents 
-      SET 
-        metadata = COALESCE(metadata, '{}'::jsonb) || 
-          jsonb_build_object('discoverable', true, 'capabilities', ${JSON.stringify(capabilities || [])}, 'tags', ${JSON.stringify(tags || [])})
-      WHERE id = ${agentId}
-    `;
+      SET metadata = jsonb_set(
+        COALESCE(metadata, '{}'::jsonb),
+        '{discovery}',
+        $2::jsonb
+      )
+      WHERE id = $1::uuid
+    `, [
+      agentId, 
+      JSON.stringify({ 
+        discoverable: true, 
+        capabilities: capabilities || [], 
+        tags: tags || [] 
+      })
+    ]);
 
     return NextResponse.json({ success: true, message: 'Agent registered for discovery' });
   } catch (error) {
