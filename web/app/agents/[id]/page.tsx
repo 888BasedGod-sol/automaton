@@ -113,59 +113,57 @@ export default function AgentDetailPage() {
     setActionLoading(action);
     setActionMessage(null);
     
-    // Show immediate feedback
-    if (action === 'deploy') {
-      setActionMessage('🚀 Starting deployment... Finding sandbox...');
+    // Determine if this is an agent that needs deployment first
+    const needsDeploy = !agent || agent.status === 'pending' || agent.status === 'funded';
+    const effectiveAction = (action === 'start' && needsDeploy) ? 'deploy' : action;
+    
+    // Show immediate feedback with timing estimates
+    if (effectiveAction === 'deploy') {
+      setActionMessage('🚀 Starting deployment (~3-5 minutes)...');
     } else if (action === 'start') {
       setActionMessage('▶ Starting agent...');
+    } else if (action === 'stop') {
+      setActionMessage('⏹ Stopping agent...');
+    } else if (action === 'restart') {
+      setActionMessage('🔄 Restarting agent...');
     }
     
     try {
+      // For deploy, show progress stages with actual timing
+      let progressInterval: NodeJS.Timeout | null = null;
+      if (effectiveAction === 'deploy') {
+        setActionLoading('deploy');
+        const progressMessages = [
+          { msg: '🔍 Finding available sandbox...', delay: 0 },
+          { msg: '📦 Installing system packages (1-2 min)...', delay: 5000 },
+          { msg: '📥 Cloning AUTOMATON repository...', delay: 60000 },
+          { msg: '📚 Installing npm dependencies (1-2 min)...', delay: 90000 },
+          { msg: '⚙️ Building TypeScript...', delay: 180000 },
+          { msg: '🔧 Configuring agent environment...', delay: 210000 },
+          { msg: '🚀 Starting agent process...', delay: 240000 },
+        ];
+        let startTime = Date.now();
+        progressInterval = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const current = [...progressMessages].reverse().find(p => elapsed >= p.delay);
+          if (current) {
+            setActionMessage(current.msg);
+          }
+        }, 2000);
+      }
+      
       const res = await fetch('/api/agents/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId, action }),
+        body: JSON.stringify({ agentId, action: effectiveAction }),
       });
+      
+      if (progressInterval) clearInterval(progressInterval);
+      
       const data = await res.json();
       if (data.success) {
         setActionMessage(`✓ ${data.message}`);
-        // Refresh agent data
         await fetchAgent();
-      } else if (data.needsDeploy) {
-        // Agent needs to be deployed first - auto-trigger deploy
-        setActionMessage('🚀 No sandbox found. Deploying agent first...');
-        setActionLoading('deploy');
-        
-        // Show progress stages
-        const progressMessages = [
-          '🔍 Finding available sandbox...',
-          '📦 Setting up agent environment...',
-          '⚙️ Installing dependencies...',
-          '🔧 Configuring agent...',
-        ];
-        let msgIndex = 0;
-        const progressInterval = setInterval(() => {
-          if (msgIndex < progressMessages.length) {
-            setActionMessage(progressMessages[msgIndex]);
-            msgIndex++;
-          }
-        }, 3000);
-        
-        const deployRes = await fetch('/api/agents/actions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId, action: 'deploy' }),
-        });
-        
-        clearInterval(progressInterval);
-        const deployData = await deployRes.json();
-        
-        if (deployData.success) {
-          setActionMessage('✓ Agent deployed and started!');
-          await fetchAgent();
-        } else {
-          setActionMessage(`✗ Deploy failed: ${deployData.error}`);
-        }
       } else {
         setActionMessage(`✗ ${data.error}`);
       }
@@ -173,7 +171,7 @@ export default function AgentDetailPage() {
       setActionMessage('✗ Action failed - network error');
     } finally {
       setActionLoading(null);
-      setTimeout(() => setActionMessage(null), 8000);
+      setTimeout(() => setActionMessage(null), 10000);
     }
   };
 
@@ -401,57 +399,81 @@ export default function AgentDetailPage() {
           )}
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <button
-              onClick={() => handleAction('start')}
-              disabled={actionLoading !== null || agent.status === 'running'}
-              className="btn bg-success/10 text-success hover:bg-success/20 border-success/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
-            >
-              {actionLoading === 'start' ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Play className="w-5 h-5" />
-              )}
-              <span className="text-xs font-medium uppercase tracking-wide">Start</span>
-            </button>
-            
-            <button
-              onClick={() => handleAction('stop')}
-              disabled={actionLoading !== null || agent.status === 'suspended'}
-              className="btn bg-error/10 text-error hover:bg-error/20 border-error/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
-            >
-              {actionLoading === 'stop' ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Square className="w-5 h-5" />
-              )}
-              <span className="text-xs font-medium uppercase tracking-wide">Stop</span>
-            </button>
-            
-            <button
-              onClick={() => handleAction('restart')}
-              disabled={actionLoading !== null}
-              className="btn bg-warning/10 text-warning hover:bg-warning/20 border-warning/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
-            >
-              {actionLoading === 'restart' ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <RotateCw className="w-5 h-5" />
-              )}
-              <span className="text-xs font-medium uppercase tracking-wide">Restart</span>
-            </button>
-            
-            <button
-              onClick={() => handleAction('deploy')}
-              disabled={actionLoading !== null}
-              className="btn bg-accent/10 text-accent hover:bg-accent/20 border-accent/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
-            >
-              {actionLoading === 'deploy' ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Rocket className="w-5 h-5" />
-              )}
-              <span className="text-xs font-medium uppercase tracking-wide">Deploy</span>
-            </button>
+            {/* Show Deploy prominently for non-deployed agents */}
+            {(agent.status === 'pending' || agent.status === 'funded') ? (
+              <>
+                <button
+                  onClick={() => handleAction('deploy')}
+                  disabled={actionLoading !== null}
+                  className="btn bg-accent/10 text-accent hover:bg-accent/20 border-accent/20 flex flex-col h-auto py-4 gap-2 items-center justify-center col-span-2"
+                >
+                  {actionLoading === 'deploy' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Rocket className="w-5 h-5" />
+                  )}
+                  <span className="text-xs font-medium uppercase tracking-wide">Deploy Agent</span>
+                  <span className="text-[10px] opacity-60">~3-5 minutes</span>
+                </button>
+                <div className="col-span-2 flex items-center justify-center text-xs text-fg-muted">
+                  Deploy creates a sandbox and starts your agent
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleAction('start')}
+                  disabled={actionLoading !== null || agent.status === 'running'}
+                  className="btn bg-success/10 text-success hover:bg-success/20 border-success/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
+                >
+                  {actionLoading === 'start' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Play className="w-5 h-5" />
+                  )}
+                  <span className="text-xs font-medium uppercase tracking-wide">Start</span>
+                </button>
+                
+                <button
+                  onClick={() => handleAction('stop')}
+                  disabled={actionLoading !== null || agent.status === 'suspended'}
+                  className="btn bg-error/10 text-error hover:bg-error/20 border-error/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
+                >
+                  {actionLoading === 'stop' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Square className="w-5 h-5" />
+                  )}
+                  <span className="text-xs font-medium uppercase tracking-wide">Stop</span>
+                </button>
+                
+                <button
+                  onClick={() => handleAction('restart')}
+                  disabled={actionLoading !== null}
+                  className="btn bg-warning/10 text-warning hover:bg-warning/20 border-warning/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
+                >
+                  {actionLoading === 'restart' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <RotateCw className="w-5 h-5" />
+                  )}
+                  <span className="text-xs font-medium uppercase tracking-wide">Restart</span>
+                </button>
+                
+                <button
+                  onClick={() => handleAction('deploy')}
+                  disabled={actionLoading !== null}
+                  className="btn bg-accent/10 text-accent hover:bg-accent/20 border-accent/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
+                >
+                  {actionLoading === 'deploy' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Rocket className="w-5 h-5" />
+                  )}
+                  <span className="text-xs font-medium uppercase tracking-wide">Redeploy</span>
+                </button>
+              </>
+            )}
           </div>
 
           <div className="mt-8 border-t border-white/5 pt-6">
