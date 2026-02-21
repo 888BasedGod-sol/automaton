@@ -27,37 +27,70 @@ export async function GET(
     
     // If agent has sandbox and is running, try to fetch live logs from Conway
     if (row.sandbox_id && row.status === 'running' && CONWAY_API_KEY) {
+      const agentDir = `/root/.automaton/agents/${id}`;
+      
       try {
-        // Use agent-specific log directory
-        const agentDir = `/root/.automaton/agents/${id}`;
-        const logResp = await fetch(`${CONWAY_API_URL}/v1/sandboxes/${row.sandbox_id}/exec`, {
+        // Also check if agent process is running
+        const checkResp = await fetch(`${CONWAY_API_URL}/v1/sandboxes/${row.sandbox_id}/exec`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': CONWAY_API_KEY,
           },
           body: JSON.stringify({
-            command: `tail -n 20 ${agentDir}/agent.log 2>/dev/null || echo "No logs yet"`,
-            timeout: 5000,
+            command: `pgrep -f "agent-dir=${agentDir}" > /dev/null && echo "RUNNING" || echo "STOPPED"; ls -la ${agentDir}/ 2>&1 | head -5; echo "---LOG---"; tail -n 30 ${agentDir}/agent.log 2>/dev/null || echo "No logs yet"`,
+            timeout: 8000,
           }),
         });
         
-        if (logResp.ok) {
-          const logData = await logResp.json();
-          if (logData.stdout) {
-            return NextResponse.json({
-              thought: logData.stdout,
-              timestamp: new Date().toISOString(),
-              source: 'sandbox',
-              success: true
-            }, {
-              headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-            });
-          }
+        if (checkResp.ok) {
+          const data = await checkResp.json();
+          const stdout = data.stdout || '';
+          const stderr = data.stderr || '';
+          
+          // Parse the response
+          const lines = stdout.split('\n');
+          const processState = lines[0]?.trim() || 'UNKNOWN';
+          const logIndex = stdout.indexOf('---LOG---');
+          const logContent = logIndex >= 0 ? stdout.substring(logIndex + 9).trim() : 'No output';
+          const dirListing = logIndex >= 0 ? stdout.substring(0, logIndex).split('\n').slice(1).join('\n').trim() : '';
+          
+          return NextResponse.json({
+            thought: logContent,
+            processState,
+            dirListing,
+            stderr,
+            timestamp: new Date().toISOString(),
+            source: 'sandbox',
+            sandboxId: row.sandbox_id,
+            success: true
+          }, {
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
+        } else {
+          const errText = await checkResp.text();
+          return NextResponse.json({
+            thought: `Sandbox exec failed: ${checkResp.status}`,
+            error: errText,
+            timestamp: new Date().toISOString(),
+            source: 'sandbox-error',
+            sandboxId: row.sandbox_id,
+            success: false
+          }, {
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
         }
-      } catch (e) {
-        // Fall through to database logs
-        console.warn('Failed to fetch sandbox logs:', e);
+      } catch (e: any) {
+        return NextResponse.json({
+          thought: `Failed to connect to sandbox: ${e.message}`,
+          error: e.message,
+          timestamp: new Date().toISOString(),
+          source: 'sandbox-error',
+          sandboxId: row.sandbox_id,
+          success: false
+        }, {
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
       }
     }
     

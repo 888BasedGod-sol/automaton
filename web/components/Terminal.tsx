@@ -21,8 +21,8 @@ interface LogLine {
 export default function Terminal({ agentId, agentName, status, onClose }: TerminalProps) {
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [lastFetched, setLastFetched] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastContentRef = useRef<string>('');
   
   // Helper to add log
   const addLog = (level: LogLine['level'], message: string) => {
@@ -46,6 +46,7 @@ export default function Terminal({ agentId, agentName, status, onClose }: Termin
   // Initial status-based logs
   useEffect(() => {
     setLogs([]); // Clear on status change
+    lastContentRef.current = ''; // Reset content tracker
     
     const now = new Date().toISOString().split('T')[1].split('.')[0];
     const initialLogs: LogLine[] = [
@@ -91,42 +92,61 @@ export default function Terminal({ agentId, agentName, status, onClose }: Termin
       if (!isMounted) return;
       try {
         const res = await fetch(`/api/agents/${agentId}/logs`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          addLog('ERROR', `Failed to fetch logs: ${res.status}`);
+          return;
+        }
         const data = await res.json();
         
-        if (data.thought && data.thought !== lastFetched) {
-          setLastFetched(data.thought);
+        // Show process state if available
+        if (data.processState && data.processState !== 'RUNNING') {
+          addLog('WARN', `Process state: ${data.processState}`);
+        }
+        
+        // Show errors from the API
+        if (data.error) {
+          addLog('ERROR', data.error);
+        }
+        
+        // Parse log content
+        const thought = data.thought || '';
+        if (thought && thought !== lastContentRef.current && thought !== 'No logs yet') {
+          lastContentRef.current = thought;
           
           // Parse multi-line logs
-          const lines = data.thought.split('\n').filter((l: string) => l.trim());
+          const lines = thought.split('\n').filter((l: string) => l.trim());
           
           if (lines.length > 0) {
-            const now = new Date().toISOString().split('T')[1].split('.')[0];
-            lines.slice(-10).forEach((line: string) => {
+            lines.slice(-15).forEach((line: string) => {
               // Detect log level from content
               let level: LogLine['level'] = 'INFO';
-              if (line.toLowerCase().includes('error')) level = 'ERROR';
-              else if (line.toLowerCase().includes('warn')) level = 'WARN';
-              else if (line.toLowerCase().includes('debug')) level = 'DEBUG';
+              const lowerLine = line.toLowerCase();
+              if (lowerLine.includes('error') || lowerLine.includes('failed') || lowerLine.includes('exception')) level = 'ERROR';
+              else if (lowerLine.includes('warn') || lowerLine.includes('warning')) level = 'WARN';
+              else if (lowerLine.includes('debug')) level = 'DEBUG';
+              else if (lowerLine.includes('[system]') || lowerLine.includes('starting') || lowerLine.includes('stopping')) level = 'SYSTEM';
               
               addLog(level, line.trim());
             });
           }
+        } else if (thought === 'No logs yet' && lastContentRef.current !== 'No logs yet') {
+          lastContentRef.current = thought;
+          addLog('SYSTEM', 'Agent started, waiting for output...');
         }
-      } catch (e) {
-        // Silent fail on poll error
+      } catch (e: any) {
+        addLog('ERROR', `Poll error: ${e.message}`);
       }
     };
     
     // Fetch immediately then poll
     fetchLogs();
-    const interval = setInterval(fetchLogs, 3000);
+    const interval = setInterval(fetchLogs, 2500);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [agentId, status, lastFetched]);
+  }, [agentId, status]);
 
   // Auto-scroll to bottom
   useEffect(() => {
