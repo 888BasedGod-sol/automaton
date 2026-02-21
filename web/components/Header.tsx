@@ -11,14 +11,17 @@ import {
 import { useWallet } from '@solana/wallet-adapter-react';
 import dynamic from 'next/dynamic';
 
+// Dynamically import WalletMultiButton to prevent SSR issues
 const WalletMultiButton = dynamic(
   async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
-  { ssr: false, loading: () => <div className="h-9 w-32 bg-white/5 rounded animate-pulse" /> }
+  { ssr: false }
 );
 
 interface HeaderProps {
   showCreate?: boolean;
 }
+
+
 
 export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
   const { connected } = useWallet();
@@ -36,7 +39,6 @@ export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
   const navLinks = [
     { href: '/agents', label: 'Directory', icon: Users },
     { href: '/network', label: 'Network', icon: Network },
-    { href: '/communicate', label: 'Comms', icon: MessageSquare },
     { href: '/dashboard', label: 'My Fleet', icon: LayoutDashboard },
   ];
 
@@ -85,19 +87,21 @@ export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
           {/* Right Section */}
           <div className="flex items-center gap-3">
             
-            <div className="wallet-adapter-dropdown">
-              <WalletMultiButton style={{
-                backgroundColor: connected ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                color: connected ? '#10b981' : '#f4f4f5',
-                height: '36px',
-                padding: '0 16px',
-                borderRadius: '8px',
-                fontSize: '13px',
-                fontWeight: '500',
-                border: connected ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255, 255, 255, 0.1)',
-                fontFamily: 'inherit',
-                transition: 'all 0.2s ease'
-              }} />
+            {/* Wallet Group */}
+            <div className="flex items-center gap-2">
+
+              {/* Solana Wallet Button */}
+              <div className="wallet-adapter-dropdown h-9">
+                <WalletMultiButton 
+                  className={`
+                    !h-9 !rounded-lg !px-4 !text-xs !font-medium !text-white !border !transition-colors !font-sans
+                    ${connected 
+                      ? '!bg-emerald-500/10 !text-emerald-500 !border-emerald-500/20 hover:!bg-emerald-500/20' 
+                      : '!bg-white/5 !border-white/10 hover:!bg-white/10'
+                    }
+                  `} 
+                />
+              </div>
             </div>
 
             {/* Mobile Menu Toggle */}

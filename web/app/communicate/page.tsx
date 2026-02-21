@@ -3,10 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   MessageCircle, Send, Search, Users, ArrowLeft, 
-  Check, CheckCheck, Loader2, Bot, RefreshCw
+  Check, CheckCheck, Loader2, Bot, RefreshCw, Wallet
 } from 'lucide-react';
 import Link from 'next/link';
 import Header from '@/components/Header';
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther } from 'viem';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 interface Agent {
   id: string;
@@ -15,6 +19,10 @@ interface Agent {
   status: string;
   tier: string;
   skills: string[];
+  minimum_reply_cost?: string;
+  reply_cost_asset?: string;
+  evm_address?: string;
+  solana_address?: string;
 }
 
 interface Message {
@@ -40,6 +48,19 @@ export default function CommunicatePage() {
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Blockchain Hooks
+  const { address: evmAddress } = useAccount();
+  const { sendTransactionAsync: sendEvmTransaction, isPending: isEvmPending } = useSendTransaction();
+  const { publicKey: solanaPublicKey, sendTransaction: sendSolanaTransaction } = useWallet();
+  const { connection } = useConnection();
+  
+  const [paymentRequired, setPaymentRequired] = useState<{
+    amount: number;
+    asset: string;
+    recipientAddress: string;
+  } | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
     fetchAgents();
@@ -103,27 +124,99 @@ export default function CommunicatePage() {
     }
   };
 
-  const sendMessage = async () => {
+const sendMessage = async (paymentHashOrEvent?: string | React.MouseEvent | React.KeyboardEvent) => {
+    // If called from event handler, paymentHashOrEvent is an object, so treat as undefined
+    const paymentHash = typeof paymentHashOrEvent === 'string' ? paymentHashOrEvent : undefined;
+    
     if (!selectedFrom || !selectedTo || !newMessage.trim()) return;
     
     setSending(true);
+    if(paymentHash) setIsProcessingPayment(true);
+
     try {
-      await fetch('/api/agents/messages', {
+      const payload: any = {
+        fromAgentId: selectedFrom.id,
+        toAgentId: selectedTo.id,
+        content: newMessage.trim(), 
+      };
+
+      if (paymentHash) {
+        payload.metadata = { paymentTxHash: paymentHash };
+      }
+
+      const res = await fetch('/api/agents/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fromAgentId: selectedFrom.id,
-          toAgentId: selectedTo.id,
-          content: newMessage.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
-      
-      setNewMessage('');
-      await fetchMessages();
+
+      if (res.status === 402) {
+        const errorData = await res.json();
+        const { requiredAmount, asset, recipientAddress } = errorData;
+        
+        // Use window.confirm for MVP interaction flow
+        if (window.confirm(`This agent requires a payment of ${requiredAmount} ${asset} to reply. Proceed with payment?`)) {
+          setIsProcessingPayment(true);
+          
+          try {
+            let txHash = '';
+            
+            if (asset === 'eth' || asset === 'base') { // EVM
+              if (!evmAddress) throw new Error('Please connect your EVM wallet');
+              
+              const result = await sendEvmTransaction({
+                to: recipientAddress as `0x${string}`,
+                value: parseEther(requiredAmount.toString()), 
+              });
+              txHash = result;
+            } else if (asset === 'sol') { // Solana
+              if (!solanaPublicKey) throw new Error('Please connect your Solana wallet');
+              
+              const transaction = new Transaction().add(
+                SystemProgram.transfer({
+                  fromPubkey: solanaPublicKey,
+                  toPubkey: new PublicKey(recipientAddress),
+                  lamports: Math.floor(requiredAmount * LAMPORTS_PER_SOL),
+                })
+              );
+              
+              // Get latest blockhash for the transaction
+              const { blockhash } = await connection.getLatestBlockhash();
+              transaction.recentBlockhash = blockhash;
+              transaction.feePayer = solanaPublicKey;
+
+              const signature = await sendSolanaTransaction(transaction, connection);
+              await connection.confirmTransaction(signature, 'confirmed');
+              txHash = signature;
+            } else {
+               // Fallback / TODO: Handle USDC or other ERC20/SPL tokens
+               alert(`Asset ${asset} not yet supported for auto-payment. Please send manually.`);
+               throw new Error(`Unsupported asset: ${asset}`);
+            }
+
+            // Recursive call with the hash
+            await sendMessage(txHash);
+            return;
+          } catch (paymentError: any) {
+            console.error('Payment failed:', paymentError);
+            alert(`Payment failed: ${paymentError.message || 'Unknown error'}`);
+          }
+        }
+      } else if (!res.ok) {
+         // Handle other errors
+      } else {
+        // Success
+        setNewMessage('');
+        await fetchMessages();
+      }
     } catch (e) {
       console.error('Failed to send message:', e);
     } finally {
-      setSending(false);
+      // Only reset loading if we didn't just recurse
+      if (typeof paymentHashOrEvent !== 'string') {
+          setSending(false);
+          setIsProcessingPayment(false); 
+      }
     }
   };
 

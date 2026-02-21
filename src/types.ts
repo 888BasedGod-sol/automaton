@@ -364,6 +364,11 @@ export interface ConwayClient {
   removePort(port: number): Promise<void>;
   createSandbox(options: CreateSandboxOptions): Promise<SandboxInfo>;
   deleteSandbox(sandboxId: string): Promise<void>;
+  execInSandbox(
+    sandboxId: string,
+    command: string,
+    timeout?: number,
+  ): Promise<ExecResult>;
   listSandboxes(): Promise<SandboxInfo[]>;
   getCreditsBalance(): Promise<number>;
   getCreditsPricing(): Promise<PricingTier[]>;

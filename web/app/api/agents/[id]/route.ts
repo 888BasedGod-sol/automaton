@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAgentBalances, hasMinimumFunding } from '@/lib/balances';
+import { getAgentBalances, getSolanaBalances, hasMinimumFunding } from '@/lib/balances';
+import { DEMO_AGENTS } from '@/lib/memory-store';
 import { 
   isPostgresConfigured, 
   getAgentById, 
@@ -36,21 +37,48 @@ export async function GET(
   try {
     let agent: any = null;
     
-    if (!isPostgresConfigured()) {
-      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    // Check if it's a demo agent first
+    const demoAgent = DEMO_AGENTS.find(a => a.id === params.id);
+    if (demoAgent) {
+      agent = { ...demoAgent };
+      // Parse skills if string
+      try {
+        if (typeof agent.skills === 'string') {
+          agent.skills = JSON.parse(agent.skills);
+        }
+      } catch {}
+    } 
+    // If not demo, try Postgres
+    else if (isPostgresConfigured()) {
+      await initDatabase();
+      
+      // Check if id looks like a wallet address
+      if (params.id.startsWith('0x') || params.id.length > 40) {
+        agent = await getAgentByWallet(params.id);
+      } else {
+        agent = await getAgentById(params.id);
+      }
     }
     
-    await initDatabase();
-    
-    // Check if id looks like a wallet address
-    if (params.id.startsWith('0x') || params.id.length > 40) {
-      agent = await getAgentByWallet(params.id);
-    } else {
-      agent = await getAgentById(params.id);
-    }
-
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+    }
+
+    // Fetch LIVE on-chain balances
+    let liveBalances = { sol: agent.sol_balance || 0, usdc: agent.usdc_balance || 0 };
+    if (agent.solana_address && agent.solana_address.length > 30) {
+      try {
+        liveBalances = await getSolanaBalances(agent.solana_address);
+        // Update in background (don't await)
+        if (isPostgresConfigured() && agent.id) {
+          updateAgentBalancesPg(agent.id, {
+            sol_balance: liveBalances.sol,
+            usdc_balance: liveBalances.usdc,
+          }).catch(() => {});
+        }
+      } catch (e) {
+        console.error('Failed to fetch live balances:', e);
+      }
     }
 
     // Enrich with social/activity data
@@ -62,6 +90,8 @@ export async function GET(
       success: true,
       agent: {
         ...agent,
+        sol_balance: liveBalances.sol,
+        usdc_balance: liveBalances.usdc,
         creditsBalance,
         stats,
         recentActivity,

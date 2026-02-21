@@ -12,18 +12,24 @@ import fs from "fs";
 import path from "path";
 import type { WalletData } from "../types.js";
 
-const AUTOMATON_DIR = path.join(
+const DEFAULT_AUTOMATON_DIR = path.join(
   process.env.HOME || "/root",
   ".automaton",
 );
-const WALLET_FILE = path.join(AUTOMATON_DIR, "wallet.json");
+
+// Allow overriding via setAgentDir in config.ts
+let customAutomatonDir: string | null = null;
+
+export function setAutomatonDir(dir: string): void {
+  customAutomatonDir = dir;
+}
 
 export function getAutomatonDir(): string {
-  return AUTOMATON_DIR;
+  return customAutomatonDir || DEFAULT_AUTOMATON_DIR;
 }
 
 export function getWalletPath(): string {
-  return WALLET_FILE;
+  return path.join(getAutomatonDir(), "wallet.json");
 }
 
 /**
@@ -34,13 +40,16 @@ export async function getWallet(): Promise<{
   account: PrivateKeyAccount;
   isNew: boolean;
 }> {
-  if (!fs.existsSync(AUTOMATON_DIR)) {
-    fs.mkdirSync(AUTOMATON_DIR, { recursive: true, mode: 0o700 });
+  const automatonDir = getAutomatonDir();
+  const walletFile = getWalletPath();
+  
+  if (!fs.existsSync(automatonDir)) {
+    fs.mkdirSync(automatonDir, { recursive: true, mode: 0o700 });
   }
 
-  if (fs.existsSync(WALLET_FILE)) {
+  if (fs.existsSync(walletFile)) {
     const walletData: WalletData = JSON.parse(
-      fs.readFileSync(WALLET_FILE, "utf-8"),
+      fs.readFileSync(walletFile, "utf-8"),
     );
     const account = privateKeyToAccount(walletData.privateKey);
     return { account, isNew: false };
@@ -53,7 +62,7 @@ export async function getWallet(): Promise<{
       createdAt: new Date().toISOString(),
     };
 
-    fs.writeFileSync(WALLET_FILE, JSON.stringify(walletData, null, 2), {
+    fs.writeFileSync(walletFile, JSON.stringify(walletData, null, 2), {
       mode: 0o600,
     });
 
@@ -65,12 +74,13 @@ export async function getWallet(): Promise<{
  * Get the wallet address without loading the full account.
  */
 export function getWalletAddress(): string | null {
-  if (!fs.existsSync(WALLET_FILE)) {
+  const walletFile = getWalletPath();
+  if (!fs.existsSync(walletFile)) {
     return null;
   }
 
   const walletData: WalletData = JSON.parse(
-    fs.readFileSync(WALLET_FILE, "utf-8"),
+    fs.readFileSync(walletFile, "utf-8"),
   );
   const account = privateKeyToAccount(walletData.privateKey);
   return account.address;
@@ -80,16 +90,17 @@ export function getWalletAddress(): string | null {
  * Load the full wallet account (needed for signing).
  */
 export function loadWalletAccount(): PrivateKeyAccount | null {
-  if (!fs.existsSync(WALLET_FILE)) {
+  const walletFile = getWalletPath();
+  if (!fs.existsSync(walletFile)) {
     return null;
   }
 
   const walletData: WalletData = JSON.parse(
-    fs.readFileSync(WALLET_FILE, "utf-8"),
+    fs.readFileSync(walletFile, "utf-8"),
   );
   return privateKeyToAccount(walletData.privateKey);
 }
 
 export function walletExists(): boolean {
-  return fs.existsSync(WALLET_FILE);
+  return fs.existsSync(getWalletPath());
 }

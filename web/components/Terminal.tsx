@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Terminal as TerminalIcon, X, Maximize2, Minimize2, Play, Square, RotateCw } from 'lucide-react';
+import { Terminal as TerminalIcon, X, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 
 interface TerminalProps {
   agentId: string;
@@ -21,100 +21,112 @@ interface LogLine {
 export default function Terminal({ agentId, agentName, status, onClose }: TerminalProps) {
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [lastFetched, setLastFetched] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  // Connect to SSE stream
-  useEffect(() => {
-    // Only connect if agent is running
-    if (status !== 'running') return;
-
-    const eventSource = new EventSource(`/api/agents/${agentId}/logs/stream`);
-    
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data && data.content) {
-             const now = new Date();
-             const timeString = now.toISOString().split('T')[1].split('.')[0];
-             
-             setLogs(prev => {
-                // Prevent duplicate logs if they are identical
-                if (prev.length > 0 && prev[prev.length - 1].message === data.content) {
-                    return prev;
-                }
-                return [...prev.slice(-100), {
-                id: Math.random().toString(36).substr(2, 9),
-                timestamp: timeString,
-                level: 'INFO',
-                message: data.content
-              }]});
-        }
-      } catch (e) {
-        console.error('Failed to parse SSE data', e);
-      }
-    };
-
-    eventSource.onerror = (err) => {
-      console.error('SSE Error:', err);
-      eventSource.close();
-      // Simple exponential backoff for reconnection could go here
-    };
-
-    return () => {
-      eventSource.close();
-    };
-  }, [agentId, status]);
-
   // Helper to add log
   const addLog = (level: LogLine['level'], message: string) => {
-      const now = new Date();
-      const timeString = now.toISOString().split('T')[1].split('.')[0];
-      
-      setLogs(prev => [...prev.slice(-100), {
+    const now = new Date();
+    const timeString = now.toISOString().split('T')[1].split('.')[0];
+    
+    setLogs(prev => {
+      // Avoid duplicate messages
+      if (prev.length > 0 && prev[prev.length - 1].message === message) {
+        return prev;
+      }
+      return [...prev.slice(-100), {
         id: Math.random().toString(36).substr(2, 9),
         timestamp: timeString,
         level,
         message
-      }]);
+      }];
+    });
   };
 
-  // Initial boot logs (mock)
+  // Initial status-based logs
   useEffect(() => {
-    if (logs.length > 0) return; // Don't overwrite if we have logs
+    setLogs([]); // Clear on status change
     
-    addLog('SYSTEM', `Initializing agent ${agentName} (${agentId.slice(0, 8)})...`);
-    addLog('INFO', 'Loading configuration...');
-    addLog('INFO', 'Connecting to network...');
-    
+    const now = new Date().toISOString().split('T')[1].split('.')[0];
+    const initialLogs: LogLine[] = [
+      {
+        id: '1',
+        timestamp: now,
+        level: 'SYSTEM',
+        message: `Agent: ${agentName} (${agentId.slice(0, 8)})`
+      }
+    ];
+
     if (status === 'running') {
-      addLog('SYSTEM', 'Agent is RUNNING');
-      addLog('INFO', 'Listening for events on port 3000');
-      addLog('DEBUG', 'Heartbeat signal active');
+      initialLogs.push(
+        { id: '2', timestamp: now, level: 'INFO', message: 'Agent is RUNNING' },
+        { id: '3', timestamp: now, level: 'INFO', message: 'Fetching live logs from sandbox...' }
+      );
+    } else if (status === 'suspended') {
+      initialLogs.push(
+        { id: '2', timestamp: now, level: 'WARN', message: 'Agent is SUSPENDED' },
+        { id: '3', timestamp: now, level: 'INFO', message: 'Click Start to resume execution' }
+      );
+    } else if (status === 'pending' || status === 'funded') {
+      initialLogs.push(
+        { id: '2', timestamp: now, level: 'INFO', message: `Status: ${status.toUpperCase()}` },
+        { id: '3', timestamp: now, level: 'INFO', message: 'Click Deploy to create sandbox and start agent' }
+      );
     } else {
-      addLog('WARN', `Agent status is: ${status.toUpperCase()}`);
+      initialLogs.push(
+        { id: '2', timestamp: now, level: 'INFO', message: `Status: ${status.toUpperCase()}` }
+      );
     }
 
-    // Periodic random logs based on status
-    const interval = setInterval(() => {
-      if (status !== 'running') return;
-      
-      const actions = [
-        { level: 'INFO', msg: 'Processing incoming message batch...' },
-        { level: 'DEBUG', msg: 'Memory usage: 45MB / 512MB' },
-        { level: 'INFO', msg: 'Running scheduled task: update_state' },
-        { level: 'INFO', msg: 'Syncing with registry...' },
-        { level: 'DEBUG', msg: 'Analyzing local context vector space' },
-        { level: 'INFO', msg: 'Heartbeat sent successfully' },
-      ];
-      
-      if (Math.random() > 0.6) {
-        const action = actions[Math.floor(Math.random() * actions.length)];
-        addLog(action.level as any, action.msg);
-      }
-    }, 3000);
+    setLogs(initialLogs);
+  }, [status, agentId, agentName]);
 
-    return () => clearInterval(interval);
-  }, []); // Run once on mount (or status change via dependency if needed)
+  // Poll logs from sandbox when running
+  useEffect(() => {
+    if (status !== 'running') return;
+
+    let isMounted = true;
+    
+    const fetchLogs = async () => {
+      if (!isMounted) return;
+      try {
+        const res = await fetch(`/api/agents/${agentId}/logs`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (data.thought && data.thought !== lastFetched) {
+          setLastFetched(data.thought);
+          
+          // Parse multi-line logs
+          const lines = data.thought.split('\n').filter((l: string) => l.trim());
+          
+          if (lines.length > 0) {
+            const now = new Date().toISOString().split('T')[1].split('.')[0];
+            lines.slice(-10).forEach((line: string) => {
+              // Detect log level from content
+              let level: LogLine['level'] = 'INFO';
+              if (line.toLowerCase().includes('error')) level = 'ERROR';
+              else if (line.toLowerCase().includes('warn')) level = 'WARN';
+              else if (line.toLowerCase().includes('debug')) level = 'DEBUG';
+              
+              addLog(level, line.trim());
+            });
+          }
+        }
+      } catch (e) {
+        // Silent fail on poll error
+      }
+    };
+    
+    // Fetch immediately then poll
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 3000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [agentId, status, lastFetched]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -127,7 +139,7 @@ export default function Terminal({ agentId, agentName, status, onClose }: Termin
     <div className={`
       flex flex-col bg-[#0c0c0e] border border-white/10 rounded-lg overflow-hidden font-mono text-xs
       transition-all duration-300 ease-in-out
-      ${isExpanded ? 'fixed inset-4 z-50 shadow-2xl' : 'h-96 w-full'}
+      ${isExpanded ? 'fixed inset-4 z-[100] shadow-2xl' : 'h-80 sm:h-96 w-full'}
     `}>
       {/* Terminal Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#1a1a1d] border-b border-white/5">

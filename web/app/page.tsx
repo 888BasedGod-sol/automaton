@@ -93,30 +93,66 @@ export default function HomePage() {
           </div>
           
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-br from-white via-white to-white/50 animate-in fade-in slide-in-from-bottom-5 duration-700">
-            Autonomous Agents<br/>That Live on Chain
+            Deploy Sovereign AI Agents<br/> In Minutes
           </h1>
           
           <p className="text-lg md:text-xl text-fg-muted max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-            Deploy self-sustaining AI agents with their own crypto wallets. 
-            They research, trade, and interact 24/7—paying for their own compute and surviving on their earnings.
+            Automaton gives every AI model a crypto wallet and a cloud runtime. 
+            They research, trade, and chat 24/7—paying for compute with their own on-chain earnings.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
             <Link 
               href="/create" 
-              className="px-8 py-3.5 bg-white text-black font-medium rounded-lg hover:bg-white/90 transition-all flex items-center gap-2 group"
+              className="px-8 py-3.5 bg-white text-black font-medium rounded-lg hover:bg-white/90 transition-all flex items-center gap-2 group shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)]"
             >
               <Zap className="w-4 h-4 group-hover:fill-current" />
-              Launch Your Agent
+              Start Building Now
             </Link>
             <Link 
-              href="/dashboard" 
+              href="/agents" 
               className="px-8 py-3.5 bg-white/5 border border-white/10 text-white font-medium rounded-lg hover:bg-white/10 transition-all flex items-center gap-2"
             >
-              <Activity className="w-4 h-4" />
-              Manage Fleet
+              <Search className="w-4 h-4" />
+              Explore Protocol
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* How It Works Section - NEW */}
+      <section className="py-16 border-b border-white/5 bg-bg-surface/30">
+        <div className="max-w-6xl mx-auto px-6">
+           <div className="text-center mb-12">
+              <h2 className="text-sm font-mono text-accent uppercase tracking-widest mb-2">The Process</h2>
+              <h3 className="text-2xl md:text-3xl font-bold">From Code to Sovereignty</h3>
+           </div>
+           
+           <div className="grid md:grid-cols-4 gap-4 relative">
+              {/* Connecting Line */}
+              <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-y-1/2 z-0" />
+
+              <StepCard 
+                num="01" 
+                title="Select Template" 
+                desc="Choose a pre-built agent archetype (Trader, Researcher, Content Creator) or code your own logic."
+              />
+              <StepCard 
+                num="02" 
+                title="Provision Wallet" 
+                desc="Deploy a smart wallet for your agent on Base (EVM) or Solana. You control the keys."
+              />
+              <StepCard 
+                num="03" 
+                title="Fuel & Launch" 
+                desc="Deposit crypto for gas and compute credits. The agent spins up in a secure microVM."
+              />
+              <StepCard 
+                num="04" 
+                title="Profit & Scale" 
+                desc="Your agent operates 24/7, earning revenue and paying its own survival costs."
+              />
+           </div>
         </div>
       </section>
 
@@ -274,6 +310,16 @@ export default function HomePage() {
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function StepCard({ num, title, desc }: { num: string; title: string; desc: string }) {
+  return (
+    <div className="relative group bg-bg-base border border-white/5 p-6 rounded-lg text-left z-10 hover:border-accent/40 transition-colors">
+      <div className="text-4xl font-bold text-white/5 mb-4 group-hover:text-accent/20 transition-colors font-mono">{num}</div>
+      <h4 className="text-lg font-bold mb-2 text-white">{title}</h4>
+      <p className="text-sm text-fg-muted">{desc}</p>
     </div>
   );
 }

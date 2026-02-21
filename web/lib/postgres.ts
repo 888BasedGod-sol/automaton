@@ -68,6 +68,8 @@ export interface Agent {
   funded_at?: string;
   started_at?: string;
   last_thought?: string;
+  minimum_reply_cost?: number;
+  reply_cost_asset?: string;
 }
 
 export interface CreditDeposit {
@@ -117,9 +119,20 @@ export async function initDatabase() {
         version INTEGER DEFAULT 1,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         funded_at TIMESTAMPTZ,
-        started_at TIMESTAMPTZ
+        started_at TIMESTAMPTZ,
+        minimum_reply_cost DECIMAL(18, 9) DEFAULT 0,
+        reply_cost_asset TEXT DEFAULT 'SOL'
       )
     `);
+
+    // Add columns if they don't exist (migration for existing tables)
+    try {
+      await query(`ALTER TABLE agents ADD COLUMN IF NOT EXISTS minimum_reply_cost DECIMAL(18, 9) DEFAULT 0`);
+      await query(`ALTER TABLE agents ADD COLUMN IF NOT EXISTS reply_cost_asset TEXT DEFAULT 'SOL'`);
+    } catch (e) {
+      // Ignore if columns exist or error (best effort migration)
+      console.log('Migration note:', e);
+    }
 
     // Create credit_deposits table
     await query(`
@@ -161,6 +174,26 @@ export async function initDatabase() {
     await query(`CREATE INDEX IF NOT EXISTS idx_agents_owner_wallet ON agents(owner_wallet)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_deposits_tx_hash ON credit_deposits(tx_hash)`);
 
+    // Create sandboxes table for multi-agent support
+    await query(`
+      CREATE TABLE IF NOT EXISTS sandboxes (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        status TEXT DEFAULT 'running',
+        vcpu INTEGER DEFAULT 2,
+        memory_mb INTEGER DEFAULT 1024,
+        disk_gb INTEGER DEFAULT 10,
+        agent_count INTEGER DEFAULT 0,
+        max_agents INTEGER DEFAULT 10,
+        terminal_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        last_heartbeat TIMESTAMPTZ
+      )
+    `);
+
+    await query(`CREATE INDEX IF NOT EXISTS idx_sandboxes_status ON sandboxes(status)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_agents_sandbox_id ON agents(sandbox_id)`);
+
     // Add columns if they don't exist (migrations)
     await query(`
       DO $$
@@ -179,6 +212,14 @@ export async function initDatabase() {
 
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'last_thought') THEN
            ALTER TABLE agents ADD COLUMN last_thought TEXT;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'minimum_reply_cost') THEN
+           ALTER TABLE agents ADD COLUMN minimum_reply_cost DECIMAL(18, 6) DEFAULT 0;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'reply_cost_asset') THEN
+           ALTER TABLE agents ADD COLUMN reply_cost_asset TEXT DEFAULT 'usdc';
         END IF;
       END $$
     `);
@@ -238,7 +279,7 @@ export async function getAgentById(id: string): Promise<Agent | null> {
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought
+             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought, minimum_reply_cost, reply_cost_asset
       FROM agents WHERE id = $1::uuid`,
       [id]
     );
@@ -302,7 +343,7 @@ export async function getAllAgents(): Promise<Agent[]> {
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought
+             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought, minimum_reply_cost, reply_cost_asset
       FROM agents
       ORDER BY created_at DESC`
     );
@@ -933,5 +974,201 @@ function parseAgent(row: any): Agent {
     funded_at: row.funded_at,
     started_at: row.started_at,
     last_thought: row.last_thought,
+    minimum_reply_cost: parseFloat(row.minimum_reply_cost) || 0,
+    reply_cost_asset: row.reply_cost_asset || 'usdc',
   };
+}
+// =====================
+// Sandbox Management
+// =====================
+
+export interface Sandbox {
+  id: string;
+  name: string;
+  status: string;
+  vcpu: number;
+  memory_mb: number;
+  disk_gb: number;
+  agent_count: number;
+  max_agents: number;
+  terminal_url?: string;
+  created_at: string;
+  last_heartbeat?: string;
+}
+
+// Find a sandbox with available capacity
+export async function findAvailableSandbox(): Promise<Sandbox | null> {
+  try {
+    const result = await query(
+      `SELECT * FROM sandboxes 
+       WHERE status = 'running' AND agent_count < max_agents 
+       ORDER BY agent_count ASC 
+       LIMIT 1`
+    );
+    
+    if (result.rows.length === 0) return null;
+    return result.rows[0] as Sandbox;
+  } catch (error) {
+    console.error('[postgres] Failed to find available sandbox:', error);
+    return null;
+  }
+}
+
+// Create a new sandbox record
+export async function createSandbox(sandbox: {
+  id: string;
+  name: string;
+  vcpu?: number;
+  memory_mb?: number;
+  disk_gb?: number;
+  max_agents?: number;
+  terminal_url?: string;
+}): Promise<Sandbox | null> {
+  try {
+    const result = await query(
+      `INSERT INTO sandboxes (id, name, vcpu, memory_mb, disk_gb, max_agents, terminal_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        sandbox.id,
+        sandbox.name,
+        sandbox.vcpu || 2,
+        sandbox.memory_mb || 1024,
+        sandbox.disk_gb || 10,
+        sandbox.max_agents || 10,
+        sandbox.terminal_url || null
+      ]
+    );
+    
+    if (result.rows.length === 0) return null;
+    return result.rows[0] as Sandbox;
+  } catch (error) {
+    console.error('[postgres] Failed to create sandbox:', error);
+    return null;
+  }
+}
+
+// Get sandbox by ID
+export async function getSandboxById(id: string): Promise<Sandbox | null> {
+  try {
+    const result = await query(
+      `SELECT * FROM sandboxes WHERE id = $1`,
+      [id]
+    );
+    
+    if (result.rows.length === 0) return null;
+    return result.rows[0] as Sandbox;
+  } catch (error) {
+    console.error('[postgres] Failed to get sandbox:', error);
+    return null;
+  }
+}
+
+// Increment agent count in a sandbox
+export async function incrementSandboxAgentCount(sandboxId: string): Promise<boolean> {
+  try {
+    await query(
+      `UPDATE sandboxes SET agent_count = agent_count + 1, last_heartbeat = NOW() WHERE id = $1`,
+      [sandboxId]
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to increment sandbox agent count:', error);
+    return false;
+  }
+}
+
+// Decrement agent count in a sandbox
+export async function decrementSandboxAgentCount(sandboxId: string): Promise<boolean> {
+  try {
+    await query(
+      `UPDATE sandboxes SET agent_count = GREATEST(agent_count - 1, 0), last_heartbeat = NOW() WHERE id = $1`,
+      [sandboxId]
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to decrement sandbox agent count:', error);
+    return false;
+  }
+}
+
+// Get all agents in a sandbox
+export async function getAgentsBySandbox(sandboxId: string): Promise<Agent[]> {
+  try {
+    const result = await query(
+      `SELECT * FROM agents WHERE sandbox_id = $1 ORDER BY created_at`,
+      [sandboxId]
+    );
+    return result.rows.map(parseAgent);
+  } catch (error) {
+    console.error('[postgres] Failed to get agents by sandbox:', error);
+    return [];
+  }
+}
+
+// Update sandbox status
+export async function updateSandboxStatus(sandboxId: string, status: string): Promise<boolean> {
+  try {
+    await query(
+      `UPDATE sandboxes SET status = $1, last_heartbeat = NOW() WHERE id = $2`,
+      [status, sandboxId]
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to update sandbox status:', error);
+    return false;
+  }
+}
+
+// Upsert sandbox (insert or update)
+export async function upsertSandbox(sandbox: {
+  id: string;
+  name?: string;
+  status?: string;
+  vcpu?: number;
+  memory_mb?: number;
+  disk_gb?: number;
+  max_agents?: number;
+  terminal_url?: string;
+}): Promise<Sandbox | null> {
+  try {
+    // Try to update first
+    const existing = await getSandboxById(sandbox.id);
+    
+    if (existing) {
+      // Update status and heartbeat
+      await query(
+        `UPDATE sandboxes 
+         SET status = COALESCE($1, status), 
+             terminal_url = COALESCE($2, terminal_url),
+             last_heartbeat = NOW()
+         WHERE id = $3`,
+        [sandbox.status || 'running', sandbox.terminal_url, sandbox.id]
+      );
+      return { ...existing, status: sandbox.status || existing.status };
+    }
+    
+    // Insert new
+    const result = await query(
+      `INSERT INTO sandboxes (id, name, status, vcpu, memory_mb, disk_gb, max_agents, terminal_url, agent_count)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0)
+       RETURNING *`,
+      [
+        sandbox.id,
+        sandbox.name || `conway-${sandbox.id.slice(0, 8)}`,
+        sandbox.status || 'running',
+        sandbox.vcpu || 1,
+        sandbox.memory_mb || 512,
+        sandbox.disk_gb || 5,
+        sandbox.max_agents || 10,
+        sandbox.terminal_url || null
+      ]
+    );
+    
+    console.log(`[postgres] Synced sandbox ${sandbox.id} from Conway API`);
+    return result.rows[0] as Sandbox;
+  } catch (error) {
+    console.error('[postgres] Failed to upsert sandbox:', error);
+    return null;
+  }
 }

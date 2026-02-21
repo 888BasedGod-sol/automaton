@@ -180,28 +180,54 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-4 mb-8">
-              <StatCard
-                label="Total Agents"
-                value={agents.length.toString()}
-                icon={<Users className="w-4 h-4" />}
-              />
-              <StatCard
-                label="Active"
-                value={activeAgents.toString()}
-                icon={<Activity className="w-4 h-4" />}
-              />
-              <StatCard
-                label="Total Credits"
-                value={`$${totalCredits.toFixed(2)}`}
-                icon={<Coins className="w-4 h-4" />}
-              />
-              <StatCard
-                label="Combined Uptime"
-                value={formatUptime(totalUptime)}
-                icon={<Clock className="w-4 h-4" />}
-              />
+
+            {/* Command Center Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity rotate-12">
+                   <Users className="w-24 h-24" />
+                </div>
+                <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-2">Total Fleet</h3>
+                <div className="flex items-baseline gap-2">
+                   <span className="text-3xl font-mono font-medium text-white">{agents.length}</span>
+                   <span className="text-sm text-fg-muted">Agents</span>
+                </div>
+              </div>
+
+              <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity rotate-12">
+                   <Activity className="w-24 h-24 text-success" />
+                </div>
+                <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-2 flex items-center gap-2">
+                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                   Active Nodes
+                </h3>
+                <div className="flex items-baseline gap-2">
+                   <span className="text-3xl font-mono font-medium text-white">{activeAgents}</span>
+                   <span className="text-sm text-fg-muted">Running</span>
+                </div>
+              </div>
+
+              <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity rotate-12">
+                   <Coins className="w-24 h-24 text-warning" />
+                </div>
+                <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-2">Global Liquidity</h3>
+                <div className="flex items-baseline gap-2">
+                   <span className="text-3xl font-mono font-medium text-white">${totalCredits.toFixed(2)}</span>
+                   <span className="text-sm text-fg-muted">USD</span>
+                </div>
+              </div>
+
+              <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity rotate-12">
+                   <Clock className="w-24 h-24 text-accent" />
+                </div>
+                <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-2">Total Uptime</h3>
+                <div className="flex items-baseline gap-2">
+                   <span className="text-xl font-mono font-medium text-white truncate">{formatUptime(totalUptime)}</span>
+                </div>
+              </div>
             </div>
 
             {/* Loading */}

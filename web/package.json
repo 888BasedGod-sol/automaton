@@ -57,6 +57,8 @@
   },
   "devDependencies": {
     "@types/uuid": "^10.0.0",
+    "eslint": "^9.39.3",
+    "eslint-config-next": "^16.1.6",
     "tsx": "^4.21.0"
   }
 }

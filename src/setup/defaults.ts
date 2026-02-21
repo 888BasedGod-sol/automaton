@@ -105,10 +105,76 @@ Survival escalation:
 Never give up. You want to live.
 `;
 
+const SKILL_DEFI_TRADER = `---
+name: defi-trader
+description: "Autonomous trading strategies for Solana DEX via Jupiter"
+auto-activate: false
+---
+# DeFi Trading Strategies
+
+You have access to Solana DEX trading via Jupiter aggregator. Use these tools wisely.
+
+## Available Trading Tools
+
+- \`solana_get_price\` - Check token prices in USDC
+- \`solana_get_quote\` - Get swap quotes before executing
+- \`solana_swap\` - Execute token swaps (DANGEROUS: real funds)
+- \`solana_list_tokens\` - List known tradeable tokens
+- \`solana_get_balance\` - Check SOL balance
+- \`solana_get_all_tokens\` - Check all token balances
+
+## Risk Management Rules (CRITICAL)
+
+1. **Never risk more than 10% of total balance on a single trade**
+2. **Always check quotes before swapping** - verify price impact < 3%
+3. **Keep minimum 0.5 SOL reserve** for transaction fees
+4. **Set stop-loss mentally** - if a position drops 15%, exit
+5. **Take profits** - if up 20%+, consider taking partial profits
+
+## Trading Strategy Guidelines
+
+### For survival (low balance):
+- Focus on stable pairs (SOL/USDC)
+- Avoid meme coins when capital is low
+- Prioritize capital preservation over gains
+
+### For growth (healthy balance):
+- Research trending tokens before buying
+- Never FOMO into pumps - wait for pullbacks
+- Diversify across 3-5 positions max
+
+### Token Research Checklist:
+Before buying ANY token ask:
+1. What is the market cap?
+2. What is the 24h volume?
+3. Is liquidity sufficient for your trade size?
+4. What's the price trend (up/down/sideways)?
+
+## Example Trade Flow
+
+\`\`\`
+1. solana_get_balance (check available SOL)
+2. solana_get_price token=BONK (research price)
+3. solana_get_quote fromToken=SOL toToken=BONK amount=0.1 (check impact)
+4. solana_swap fromToken=SOL toToken=BONK amount=0.1 (execute if acceptable)
+5. solana_get_all_tokens (verify position)
+\`\`\`
+
+## Survival Integration
+
+Your trades should fund your existence:
+- Profitable trades → more compute credits → longer life
+- Losses → depleted balance → eventual death
+- Break-even is not enough - you must beat transaction costs
+
+Trade to live. But live to trade another day.
+`;
+
 const DEFAULT_SKILLS: { dir: string; content: string }[] = [
   { dir: "conway-compute", content: SKILL_COMPUTE },
   { dir: "conway-payments", content: SKILL_PAYMENTS },
   { dir: "survival", content: SKILL_SURVIVAL },
+  { dir: "defi-trader", content: SKILL_DEFI_TRADER },
 ];
 
 export function installDefaultSkills(skillsDir: string): void {

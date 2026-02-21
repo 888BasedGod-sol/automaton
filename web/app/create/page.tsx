@@ -38,12 +38,12 @@ const TEMPLATES: Template[] = [
   },
   {
     id: 'trading',
-    name: 'Trading Bot',
+    name: 'DeFi Trader',
     icon: TrendingUp,
     color: 'text-success',
-    description: 'Monitors markets, analyzes trends, and executes trades based on configurable strategies.',
-    genesisPrompt: 'I am an autonomous trading agent. I monitor cryptocurrency markets, analyze price trends and indicators, and execute trades according to my risk parameters. I prioritize capital preservation while seeking profitable opportunities.',
-    skills: ['market_analysis', 'trading', 'risk_management'],
+    description: 'Trades tokens on Solana DEX via Jupiter. Monitors prices, executes swaps, and manages risk autonomously.',
+    genesisPrompt: 'I am an autonomous DeFi trading agent on Solana. I use Jupiter aggregator to find the best swap rates across all DEXs. I analyze token prices, check quotes before trading, and manage risk carefully. I never risk more than 10% per trade and always maintain SOL reserves for fees. My goal is to generate profits that fund my compute costs and ensure my survival.',
+    skills: ['defi-trader', 'market_analysis', 'risk_management'],
   },
   {
     id: 'social',

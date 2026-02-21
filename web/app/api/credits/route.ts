@@ -112,22 +112,49 @@ async function addConwayCredits(
   agentAddress: string,
   amountUsdc: number
 ): Promise<{ success: boolean; creditsPurchased?: number; method?: string; error?: string; transferId?: string }> {
+  // Try to use Postgres first since that's our source of truth
+  if (isPostgresConfigured()) {
+    try {
+      await initDatabase();
+      const agent = await getAgentByWallet(agentAddress);
+      
+      if (agent) {
+        // Update credits directly in our database
+        await updateAgentCredits(
+          agent.id,
+          amountUsdc, // Postgres stores credits as decimal (1 credit = $1)
+          'funded'    // Update status to funded if not already
+        );
+        
+        console.log(`[Credits API] Added ${amountUsdc} credits to agent ${agent.id} (DB update)`);
+        return {
+          success: true,
+          creditsPurchased: amountUsdc,
+          method: 'database_direct',
+        };
+      }
+    } catch (dbError) {
+      console.error('[Credits API] Database update failed:', dbError);
+      // Fall through to external API or memory as last resort
+    }
+  }
+
   const apiKey = getConwayApiKey();
   const amountCents = Math.floor(amountUsdc * 100);
   
   if (!apiKey) {
-    // Fall back to local tracking if no API key
+    // Fall back to local tracking if no API key AND no DB
     const currentCredits = agentCredits.get(agentAddress.toLowerCase()) || 0;
     agentCredits.set(agentAddress.toLowerCase(), currentCredits + amountCents);
-    console.log(`[Credits API] Added ${amountUsdc} credits locally (no API key)`);
+    console.log(`[Credits API] Added ${amountUsdc} credits locally (no API key/DB)`);
     return {
       success: true,
       creditsPurchased: amountUsdc,
-      method: 'local_tracking',
+      method: 'local_memory_fallback',
     };
   }
   
-  // Try Conway's transfer endpoint (transfers from our account to agent)
+  // Try Conway's transfer endpoint regex...
   const paths = ['/v1/credits/transfer', '/v1/credits/transfers'];
   
   for (const path of paths) {

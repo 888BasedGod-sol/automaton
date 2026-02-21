@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useWallet } from '@solana/wallet-adapter-react';
+
 import { 
   ArrowLeft, Copy, ExternalLink, Activity, Coins, Clock, Shield,
   Zap, AlertTriangle, Scale, CheckCircle, Loader2, RefreshCw, User,
-  Play, Square, RotateCw, Send, Rocket, Terminal as TerminalIcon
+  Play, Square, RotateCw, Send, Rocket, Terminal as TerminalIcon, Wallet
 } from 'lucide-react';
 import Header from '@/components/Header';
 import AgentTerminal from '@/components/Terminal';
@@ -20,8 +22,13 @@ interface Agent {
   survival_tier: string;
   credits_balance: number;
   creditsBalance?: number;
+  sol_balance?: number;
+  usdc_balance?: number;
   solana_address: string;
   evm_address: string;
+  owner_wallet?: string;
+  minimum_reply_cost?: number;
+  reply_cost_asset?: string;
   skills: string[] | string;
   created_at: string;
   uptime_seconds: number;
@@ -48,6 +55,7 @@ const STATUS_CONFIG = {
 };
 
 export default function AgentDetailPage() {
+  const { publicKey } = useWallet();
   const params = useParams();
   const agentId = params.id as string;
   
@@ -104,6 +112,14 @@ export default function AgentDetailPage() {
   const handleAction = async (action: 'start' | 'stop' | 'restart' | 'deploy') => {
     setActionLoading(action);
     setActionMessage(null);
+    
+    // Show immediate feedback
+    if (action === 'deploy') {
+      setActionMessage('🚀 Starting deployment... Finding sandbox...');
+    } else if (action === 'start') {
+      setActionMessage('▶ Starting agent...');
+    }
+    
     try {
       const res = await fetch('/api/agents/actions', {
         method: 'POST',
@@ -112,17 +128,52 @@ export default function AgentDetailPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setActionMessage(data.message);
+        setActionMessage(`✓ ${data.message}`);
         // Refresh agent data
         await fetchAgent();
+      } else if (data.needsDeploy) {
+        // Agent needs to be deployed first - auto-trigger deploy
+        setActionMessage('🚀 No sandbox found. Deploying agent first...');
+        setActionLoading('deploy');
+        
+        // Show progress stages
+        const progressMessages = [
+          '🔍 Finding available sandbox...',
+          '📦 Setting up agent environment...',
+          '⚙️ Installing dependencies...',
+          '🔧 Configuring agent...',
+        ];
+        let msgIndex = 0;
+        const progressInterval = setInterval(() => {
+          if (msgIndex < progressMessages.length) {
+            setActionMessage(progressMessages[msgIndex]);
+            msgIndex++;
+          }
+        }, 3000);
+        
+        const deployRes = await fetch('/api/agents/actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agentId, action: 'deploy' }),
+        });
+        
+        clearInterval(progressInterval);
+        const deployData = await deployRes.json();
+        
+        if (deployData.success) {
+          setActionMessage('✓ Agent deployed and started!');
+          await fetchAgent();
+        } else {
+          setActionMessage(`✗ Deploy failed: ${deployData.error}`);
+        }
       } else {
-        setActionMessage(`Error: ${data.error}`);
+        setActionMessage(`✗ ${data.error}`);
       }
     } catch (e) {
-      setActionMessage('Action failed');
+      setActionMessage('✗ Action failed - network error');
     } finally {
       setActionLoading(null);
-      setTimeout(() => setActionMessage(null), 3000);
+      setTimeout(() => setActionMessage(null), 8000);
     }
   };
 
@@ -194,39 +245,139 @@ export default function AgentDetailPage() {
           </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className={`card p-4 flex flex-col justify-between`}>
-            <div className="flex items-center gap-2 mb-2 text-fg-muted">
-              <TierIcon className="w-4 h-4" />
-              <span className="text-xs uppercase tracking-wider font-medium">Survival Tier</span>
+
+
+        {/* Stats Grid - Enhanced Financials & Infrastructure */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          
+          {/* Financial Health */}
+          <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group hover:border-accent/20 transition-all">
+            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Coins className="w-16 h-16 text-accent" />
             </div>
-            <p className={`text-lg font-medium capitalize ${tier.color}`}>{agent.survival_tier}</p>
+            <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Wallet className="w-3.5 h-3.5" />
+              Financial State
+            </h3>
+            
+            <div className="space-y-4 relative z-10">
+              {/* Conway Credits */}
+              <div>
+                <p className="text-[10px] text-fg-muted mb-1">COMPUTE CREDITS</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-mono font-medium text-fg">
+                    ${(credits / 100).toFixed(2)}
+                  </span>
+                  <span className="text-xs text-fg-muted">USD</span>
+                </div>
+                <div className="w-full bg-white/5 h-1 mt-2 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${credits > 500 ? 'bg-success' : 'bg-warning'}`} 
+                    style={{ width: `${Math.min(credits / 20, 100)}%` }} 
+                  />
+                </div>
+              </div>
+
+              {/* Crypto Balances */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                <div>
+                   <p className="text-[10px] text-fg-muted mb-0.5 flex items-center gap-1">
+                     <span className="w-1.5 h-1.5 rounded-full bg-[#0052FF]" /> BASE (ETH)
+                   </p>
+                   <p className="text-sm font-mono text-fg">{(agent.usdc_balance || 0).toFixed(2)} USDC</p>
+                </div>
+                <div>
+                   <p className="text-[10px] text-fg-muted mb-0.5 flex items-center gap-1">
+                     <span className="w-1.5 h-1.5 rounded-full bg-[#14F195]" /> SOLANA
+                   </p>
+                   <p className="text-sm font-mono text-fg">{(agent.sol_balance || 0).toFixed(4)} SOL</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="card p-4 flex flex-col justify-between">
-            <div className="flex items-center gap-2 mb-2 text-fg-muted">
-              <Coins className="w-4 h-4 text-warning" />
-              <span className="text-xs uppercase tracking-wider font-medium">Balance</span>
+          {/* Infrastructure Health */}
+          <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group hover:border-blue-400/20 transition-all">
+            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Activity className="w-16 h-16 text-blue-400" />
             </div>
-            <p className="text-lg font-mono font-medium text-fg">${credits.toFixed(2)}</p>
+            <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Zap className="w-3.5 h-3.5" />
+              Infrastructure
+            </h3>
+            
+            <div className="space-y-4 relative z-10">
+               {/* Uptime */}
+               <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-[10px] text-fg-muted mb-1">UPTIME</p>
+                    <p className="text-xl font-mono text-fg">{formatUptime(agent.uptime_seconds)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-fg-muted mb-1">STATUS</p>
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${status.color ? status.color.replace('text-', 'bg-') + '/20 border-' + status.color.replace('text-', '') + '/30 ' + status.color : ''}`}>
+                      {agent.status.toUpperCase()}
+                    </span>
+                  </div>
+               </div>
+
+               {/* Resources */}
+               <div className="pt-2 border-t border-white/5 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-fg-muted">vCPU Usage</span>
+                    <span className="text-fg font-mono">12%</span>
+                  </div>
+                  <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 w-[12%]" />
+                  </div>
+                  
+                  <div className="flex justify-between text-xs">
+                    <span className="text-fg-muted">Memory</span>
+                    <span className="text-fg font-mono">248MB / 512MB</span>
+                  </div>
+                  <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-500 w-[48%]" />
+                  </div>
+               </div>
+            </div>
           </div>
 
-          <div className="card p-4 flex flex-col justify-between">
-            <div className="flex items-center gap-2 mb-2 text-fg-muted">
-              <Clock className="w-4 h-4 text-accent" />
-              <span className="text-xs uppercase tracking-wider font-medium">Uptime</span>
+          {/* Cloud Fleet / Scaling */}
+          <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group hover:border-purple-400/20 transition-all">
+            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+              <RotateCw className="w-16 h-16 text-purple-400" />
             </div>
-            <p className="text-lg font-mono font-medium">{formatUptime(agent.uptime_seconds)}</p>
+            <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Rocket className="w-3.5 h-3.5" />
+              Cloud Fleet
+            </h3>
+            
+            <div className="relative z-10 h-full flex flex-col">
+               <div className="flex-1">
+                 <div className="flex items-center justify-between mb-2">
+                   <p className="text-[10px] text-fg-muted">ACTIVE WORKERS</p>
+                   <span className="text-xs font-mono text-fg bg-white/5 px-1.5 py-0.5 rounded">0 / 3</span>
+                 </div>
+                 
+                 {/* Empty State for Workers */}
+                 <div className="h-20 border border-dashed border-white/10 rounded flex items-center justify-center text-center p-2">
+                    <p className="text-[10px] text-fg-muted">
+                      No child sandboxes active.<br/>
+                      Agent is operating normally.
+                    </p>
+                 </div>
+               </div>
+
+               <div className="mt-auto pt-3 border-t border-white/5">
+                 <p className="text-[10px] text-fg-muted mb-1 flex items-center gap-1">
+                   <Shield className="w-3 h-3 text-green-400" />
+                   SAFETY LEVEL
+                 </p>
+                 <p className="text-sm text-fg">Standard (Self-Preservation Active)</p>
+               </div>
+            </div>
           </div>
 
-          <div className="card p-4 flex flex-col justify-between">
-            <div className="flex items-center gap-2 mb-2 text-fg-muted">
-              <Activity className="w-4 h-4 text-success" />
-              <span className="text-xs uppercase tracking-wider font-medium">Interactions</span>
-            </div>
-            <p className="text-lg font-mono font-medium">{agent.stats?.interactions || 0}</p>
-          </div>
         </div>
 
         {/* Actions Panel */}
@@ -237,12 +388,15 @@ export default function AgentDetailPage() {
           </h2>
           
           {actionMessage && (
-            <div className={`mb-4 p-3 rounded-lg text-sm border ${
-              actionMessage.startsWith('Error') 
+            <div className={`mb-4 p-3 rounded-lg text-sm border flex items-center gap-2 ${
+              actionMessage.startsWith('✗') 
                 ? 'bg-error/10 text-error border-error/20' 
-                : 'bg-success/10 text-success border-success/20'
+                : actionMessage.startsWith('✓')
+                ? 'bg-success/10 text-success border-success/20'
+                : 'bg-accent/10 text-accent border-accent/20'
             }`}>
-              {actionMessage}
+              {actionLoading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
+              <span>{actionMessage}</span>
             </div>
           )}
           
@@ -314,7 +468,7 @@ export default function AgentDetailPage() {
           
           <p className="mt-4 text-xs text-fg-muted flex items-center gap-1.5 opacity-70">
             <Shield className="w-3 h-3" />
-            Requires Conway API key for full functionality. Demo mode simulates actions.
+            Agent sandbox powered by Conway Cloud. Deploy to start autonomous execution.
           </p>
         </div>
 

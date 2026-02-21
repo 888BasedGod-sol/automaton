@@ -28,3 +28,5 @@ data/*.json
 out/
 build/
 *.log
+.vercel
+.env*.local

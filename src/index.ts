@@ -7,9 +7,9 @@
  * the heartbeat daemon + agent loop.
  */
 
-import { getWallet, getAutomatonDir } from "./identity/wallet.js";
+import { getWallet, getAutomatonDir, setAutomatonDir } from "./identity/wallet.js";
 import { provision, loadApiKeyFromConfig } from "./identity/provision.js";
-import { loadConfig, resolvePath } from "./config.js";
+import { loadConfig, resolvePath, setAgentDir, getAgentDir } from "./config.js";
 import { createDatabase } from "./state/database.js";
 import { createConwayClient } from "./conway/client.js";
 import { createInferenceClient } from "./conway/inference.js";
@@ -25,6 +25,27 @@ import { createSocialClient } from "./social/client.js";
 import type { AutomatonIdentity, AgentState, Skill, SocialClientInterface } from "./types.js";
 
 const VERSION = "0.1.0";
+
+// Parse --agent-dir argument early
+function parseAgentDir(): string | null {
+  const args = process.argv.slice(2);
+  const agentDirIndex = args.findIndex(a => a === '--agent-dir' || a.startsWith('--agent-dir='));
+  if (agentDirIndex === -1) return null;
+  
+  const arg = args[agentDirIndex];
+  if (arg.includes('=')) {
+    return arg.split('=')[1];
+  }
+  return args[agentDirIndex + 1] || null;
+}
+
+// Set agent directory before any other operations
+const agentDir = parseAgentDir();
+if (agentDir) {
+  setAgentDir(agentDir);
+  setAutomatonDir(agentDir);  // Also update wallet path
+  console.log(`[config] Using agent directory: ${agentDir}`);
+}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);

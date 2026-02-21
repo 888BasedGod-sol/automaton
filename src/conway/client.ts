@@ -145,6 +145,23 @@ export function createConwayClient(
     await request("DELETE", `/v1/sandboxes/${targetId}`);
   };
 
+  const execInSandbox = async (
+    targetId: string,
+    command: string,
+    timeout?: number,
+  ): Promise<ExecResult> => {
+    const result = await request(
+      "POST",
+      `/v1/sandboxes/${targetId}/exec`,
+      { command, timeout },
+    );
+    return {
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
+      exitCode: result.exit_code ?? result.exitCode ?? 0,
+    };
+  };
+
   const listSandboxes = async (): Promise<SandboxInfo[]> => {
     const result = await request("GET", "/v1/sandboxes");
     const sandboxes = Array.isArray(result)

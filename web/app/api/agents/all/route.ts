@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { DEMO_AGENTS } from '@/lib/memory-store';
 import { getAllAgents as getPostgresAgents, isPostgresConfigured, initDatabase } from '@/lib/postgres';
 import { fetchRegistryAgents, RegistryAgent } from '@/lib/registry';
 
@@ -127,10 +126,8 @@ export async function GET(request: NextRequest) {
 
     let allAgents = [...dbAgents, ...externalAgents];
 
-    // If absolutely nothing, fallback to Demo
-    if (allAgents.length === 0) {
-        allAgents = [...DEMO_AGENTS].map(enrichAgent);
-    }
+    // No demo fallback - return actual agents only
+    // Users can create agents through /create
 
     // Filter
     let result = deployedOnly ? allAgents.filter(a => a.deployment?.onChain) : allAgents;
@@ -160,14 +157,12 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in GET /api/agents/all:', error);
-    // Fallback completely
-    const demoAgents = [...DEMO_AGENTS].map(enrichAgent);
+    // Return empty on error - no fake demo data
     return NextResponse.json({
-      success: true,
-      agents: demoAgents,
-      total: demoAgents.length,
-      fallback: true,
+      success: false,
+      agents: [],
+      total: 0,
       error: error?.message || String(error),
-    });
+    }, { status: 500 });
   }
 }

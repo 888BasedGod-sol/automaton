@@ -2,6 +2,7 @@
  * Automaton Configuration
  *
  * Loads and saves the automaton's configuration from ~/.automaton/automaton.json
+ * or from a custom directory via --agent-dir argument.
  */
 
 import fs from "fs";
@@ -14,8 +15,19 @@ import { loadApiKeyFromConfig } from "./identity/provision.js";
 
 const CONFIG_FILENAME = "automaton.json";
 
+// Allow overriding the config directory via --agent-dir argument
+let customAgentDir: string | null = null;
+
+export function setAgentDir(dir: string): void {
+  customAgentDir = dir;
+}
+
+export function getAgentDir(): string {
+  return customAgentDir || getAutomatonDir();
+}
+
 export function getConfigPath(): string {
-  return path.join(getAutomatonDir(), CONFIG_FILENAME);
+  return path.join(getAgentDir(), CONFIG_FILENAME);
 }
 
 /**

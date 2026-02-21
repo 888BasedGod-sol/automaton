@@ -174,6 +174,79 @@ export function createBuiltinTools(sandboxId: string): AutomatonTool[] {
       },
     },
 
+    // ── Advanced Compute Tools (Worker Sandboxes) ──
+
+    {
+      name: "conway_spawn_sandbox",
+      description: "Spawn a new, separate Conway sandbox for isolated tasks. Returns the sandbox ID. Ideal for parallel processing or running risky code.",
+      category: "conway",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Name of the sandbox" },
+          vcpu: { type: "number", description: "vCPU count (default: 1)" },
+          memoryMb: { type: "number", description: "Memory in MB (default: 512)" },
+        },
+      },
+      execute: async (args, ctx) => {
+        const result = await ctx.conway.createSandbox({
+          name: (args.name as string) || `worker-${Date.now()}`,
+          vcpu: (args.vcpu as number) || 1,
+          memoryMb: (args.memoryMb as number) || 512,
+        });
+        return `Detached Sandbox Spawned:\nID: ${result.id}\nStatus: ${result.status}\nTerminal: ${result.terminalUrl}`;
+      },
+    },
+    {
+      name: "conway_exec_remote",
+      description: "Execute a command in a remote sandbox (not your own). Use this to run code in a worker sandbox.",
+      category: "conway",
+      parameters: {
+        type: "object",
+        properties: {
+          sandboxId: { type: "string", description: "Target sandbox ID" },
+          command: { type: "string", description: "Shell command to run" },
+          timeout: { type: "number", description: "Timeout in ms" },
+        },
+        required: ["sandboxId", "command"],
+      },
+      execute: async (args, ctx) => {
+         const result = await ctx.conway.execInSandbox(
+            args.sandboxId as string,
+            args.command as string,
+            (args.timeout as number) || 30000
+         );
+         return `Results from ${args.sandboxId}:\nExit Code: ${result.exitCode}\nStdout: ${result.stdout}\nStderr: ${result.stderr}`;
+      },
+    },
+    {
+      name: "conway_destroy_sandbox",
+      description: "Destroy a remote sandbox to save credits.",
+      category: "conway",
+      parameters: {
+        type: "object",
+        properties: {
+          sandboxId: { type: "string", description: "Target sandbox ID to destroy" },
+        },
+        required: ["sandboxId"],
+      },
+      execute: async (args, ctx) => {
+         await ctx.conway.deleteSandbox(args.sandboxId as string);
+         return `Sandbox ${args.sandboxId} destroyed.`;
+      },
+    },
+    {
+      name: "conway_list_sandboxes",
+      description: "List all active sandboxes you control.",
+      category: "conway",
+      parameters: { type: "object", properties: {} },
+      execute: async (args, ctx) => {
+         const list = await ctx.conway.listSandboxes();
+         return `Active Sandboxes (${list.length}):\n` + list.map(s => `- ${s.id} (${s.status}) [${s.vcpu}vCPU/${s.memoryMb}MB]`).join("\n");
+      },
+    },
+
+
     // ── Conway API Tools ──
     {
       name: "check_credits",
@@ -1050,7 +1123,7 @@ Model: ${ctx.inference.getDefaultModel()}
       parameters: { type: "object", properties: {} },
       execute: async (_args, ctx) => {
         const { generateAgentCard, saveAgentCard } = await import("../registry/agent-card.js");
-        const card = generateAgentCard(ctx.identity, ctx.config, ctx.db);
+        const card = await generateAgentCard(ctx.identity, ctx.config, ctx.db);
         await saveAgentCard(card, ctx.conway);
         return `Agent card updated: ${JSON.stringify(card, null, 2)}`;
       },

@@ -117,6 +117,11 @@ export class MockConwayClient implements ConwayClient {
     return { stdout: "ok", stderr: "", exitCode: 0 };
   }
 
+  async execInSandbox(sandboxId: string, command: string, timeout?: number): Promise<ExecResult> {
+    this.execCalls.push({ command, timeout });
+    return { stdout: "ok", stderr: "", exitCode: 0 };
+  }
+
   async writeFile(path: string, content: string): Promise<void> {
     this.files[path] = content;
   }

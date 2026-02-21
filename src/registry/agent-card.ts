@@ -18,14 +18,16 @@ import type {
 const AGENT_CARD_TYPE =
   "https://eips.ethereum.org/EIPS/eip-8004#registration-v1";
 
+import { getSolanaWallet } from "../identity/solana-wallet.js";
+
 /**
  * Generate an agent card from the automaton's current state.
  */
-export function generateAgentCard(
+export async function generateAgentCard(
   identity: AutomatonIdentity,
   config: AutomatonConfig,
   db: AutomatonDatabase,
-): AgentCard {
+): Promise<AgentCard> {
   const services: AgentService[] = [
     {
       name: "agentWallet",
@@ -36,6 +38,19 @@ export function generateAgentCard(
       endpoint: config.conwayApiUrl,
     },
   ];
+
+  try {
+    const { publicKey } = await getSolanaWallet();
+    if (publicKey) {
+      services.push({
+        name: "solanaWallet",
+        endpoint: `solana:${publicKey.toBase58()}`,
+      });
+    }
+  } catch (err) {
+    // Solana wallet not initialized or failed to load
+    // Currently optional, so we ignore
+  }
 
   // Add sandbox endpoint if available
   if (identity.sandboxId) {

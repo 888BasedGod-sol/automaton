@@ -197,4 +197,58 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
     return { shouldWake: false };
   },
 
+  /**
+   * Market monitoring task for DeFi trader agents.
+   * Wakes the agent periodically to check markets and execute trades.
+   */
+  check_markets: async (ctx) => {
+    // Only wake if the agent has trading skills
+    const skills = ctx.db.getKV("installed_skills");
+    const hasTrading = skills && (
+      skills.includes("defi-trader") || 
+      skills.includes("trading") ||
+      skills.includes("solana-trader")
+    );
+    
+    if (!hasTrading) {
+      return { shouldWake: false };
+    }
+
+    // Check if we have Solana balance to trade with
+    const solanaState = ctx.db.getKV("solana_wallet_state");
+    let hasBalance = false;
+    
+    if (solanaState) {
+      try {
+        const state = JSON.parse(solanaState);
+        // Wake if we have more than 0.01 SOL (for gas) and some tradeable assets
+        hasBalance = state.solBalance > 0.01 || (state.tokens && Object.keys(state.tokens).length > 0);
+      } catch {}
+    }
+
+    if (!hasBalance) {
+      // No funds to trade - check less frequently
+      const lastCheck = ctx.db.getKV("last_market_check");
+      if (lastCheck) {
+        const timeSince = Date.now() - new Date(lastCheck).getTime();
+        // Only wake once per hour if no funds
+        if (timeSince < 3600000) {
+          return { shouldWake: false };
+        }
+      }
+      ctx.db.setKV("last_market_check", new Date().toISOString());
+      return {
+        shouldWake: true,
+        message: "Market check: No trading funds detected. Check Solana wallet funding.",
+      };
+    }
+
+    // Agent has trading capability and funds - wake to analyze markets
+    ctx.db.setKV("last_market_check", new Date().toISOString());
+    return {
+      shouldWake: true,
+      message: "Market analysis window: Check trending tokens, analyze positions, and consider trades based on your strategy.",
+    };
+  },
+
 };

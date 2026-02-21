@@ -70,6 +70,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if recipient requires payment
+    const recipientResult = await query(
+      'SELECT minimum_reply_cost, reply_cost_asset, evm_address, solana_address, owner_wallet FROM agents WHERE id = $1',
+      [toAgentId]
+    );
+    
+    if (recipientResult.rows.length > 0) {
+      const recipient = recipientResult.rows[0];
+      const cost = parseFloat(recipient.minimum_reply_cost || '0');
+      
+      if (cost > 0) {
+        // Determine recipient address (Owner > Agent)
+        // If the agent has an owner wallet set, funds go there directly.
+        // Otherwise, they go to the agent to fund its own survival.
+        const recipientAddress = recipient.reply_cost_asset === 'sol' 
+          ? (recipient.owner_wallet || recipient.solana_address) 
+          : (recipient.owner_wallet || recipient.evm_address); // Assuming owner wallet supports both chains or is just an address string
+
+        // NOTE: If owner_wallet is a Solana address but asset is ETH, this fails.
+        // For MVP, we assume owner_wallet matches the asset chain, or we fallback to agent wallet.
+        // A robust system would store owner_sol_wallet AND owner_evm_wallet.
+        // For now, let's just use agent address if we can't be sure, OR check format.
+        
+        let finalRecipient = recipientAddress;
+        const isSolanaAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(finalRecipient || '');
+        const isEvmAddress = /^0x[a-fA-F0-9]{40}$/.test(finalRecipient || '');
+
+        if (recipient.reply_cost_asset === 'sol' && !isSolanaAddress) {
+           finalRecipient = recipient.solana_address;
+        } else if (recipient.reply_cost_asset !== 'sol' && !isEvmAddress) {
+           finalRecipient = recipient.evm_address;
+        }
+
+        const paymentTx = metadata?.paymentTxHash;
+        
+        // If no payment provided for paid agent
+        if (!paymentTx) {
+          return NextResponse.json({
+            error: 'Payment required',
+            requiredAmount: cost,
+            asset: recipient.reply_cost_asset || 'usdc',
+            recipientAddress: finalRecipient
+          }, { status: 402 });
+        }
+        
+        // TODO: Verify transaction on-chain here
+        // For now, we trust the client provided a hash, but in production
+        // we would use viem/web3.js to check if tx confirms and transfers correct amount
+      }
+    }
+
     // Insert message
     const result = await query(`
       INSERT INTO agent_messages (from_agent_id, to_agent_id, content, message_type, metadata)

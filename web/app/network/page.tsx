@@ -547,13 +547,7 @@ export default function NetworkPage() {
                   </div>
                </div>
 
-               <Link 
-                  href={`/agents/${selectedAgent.id}`}
-                  className="btn btn-primary w-full justify-center group"
-                >
-                  <span className="group-hover:translate-x-1 transition-transform inline-block">Execute Audit</span>
-                  <ExternalLink className="w-3.5 h-3.5 ml-2 opacity-70" />
-               </Link>
+
             </div>
           </div>
         )}

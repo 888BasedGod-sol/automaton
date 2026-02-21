@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/postgres';
 
-export const revalidate = 10; // Cache for 10 seconds
+export const dynamic = 'force-dynamic'; // No static generation
+export const revalidate = 0; // No caching by default
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,8 +47,11 @@ export async function GET(request: NextRequest) {
         activeAgents: parseInt(stats.active_agents),
         totalTransactions: parseInt(stats.total_transactions),
         networkValue: parseFloat(stats.network_value)
+      }
+    }, {
+      headers: {
+        'Cache-Control': 's-maxage=5, stale-while-revalidate=59',
       },
-      simulated: false
     });
   } catch (error: any) {
     console.error('Network traffic error:', error);
