@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 const CONWAY_API_URL = process.env.CONWAY_API_URL || 'https://api.conway.tech';
 const CONWAY_API_KEY = process.env.CONWAY_API_KEY || '';
-const AUTOMATON_REPO = 'https://github.com/automatoncloud/automaton.git';
+const AUTOMATON_REPO = 'https://github.com/888BasedGod-sol/automaton.git';
 
 /**
  * Sync existing sandboxes from Conway API to the database.
