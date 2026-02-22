@@ -279,7 +279,7 @@ export async function getAgentById(id: string): Promise<Agent | null> {
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought, minimum_reply_cost, reply_cost_asset
+             agent_card, erc8004_id, sandbox_id, version, created_at, funded_at, started_at, last_thought, minimum_reply_cost, reply_cost_asset
       FROM agents WHERE id = $1::uuid`,
       [id]
     );
@@ -299,7 +299,7 @@ export async function getAgentByWallet(wallet: string): Promise<Agent | null> {
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought
+             agent_card, erc8004_id, sandbox_id, version, created_at, funded_at, started_at, last_thought
       FROM agents 
       WHERE LOWER(evm_address) = LOWER($1) OR solana_address = $1
       LIMIT 1`,
@@ -343,7 +343,7 @@ export async function getAllAgents(): Promise<Agent[]> {
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at, last_thought, minimum_reply_cost, reply_cost_asset
+             agent_card, erc8004_id, sandbox_id, version, created_at, funded_at, started_at, last_thought, minimum_reply_cost, reply_cost_asset
       FROM agents
       ORDER BY created_at DESC`
     );
@@ -362,7 +362,7 @@ export async function getAgentsByOwner(ownerWallet: string): Promise<Agent[]> {
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
              status, survival_tier, credits_balance, sol_balance, usdc_balance,
              uptime_seconds, last_heartbeat, parent_id, children_count, skills,
-             agent_card, erc8004_id, version, created_at, funded_at, started_at
+             agent_card, erc8004_id, sandbox_id, version, created_at, funded_at, started_at
       FROM agents
       WHERE owner_wallet = $1
       ORDER BY created_at DESC`,

@@ -6,7 +6,25 @@ export const dynamic = 'force-dynamic';
 const CONWAY_API_URL = process.env.CONWAY_API_URL || 'https://api.conway.tech';
 const CONWAY_API_KEY = process.env.CONWAY_API_KEY || '';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const checkAgents = searchParams.get('agents');
+  
+  // If ?agents=true, query database for agents with sandbox_ids
+  if (checkAgents && isPostgresConfigured()) {
+    try {
+      const result = await query(
+        `SELECT id, name, status, sandbox_id FROM agents ORDER BY created_at DESC LIMIT 20`
+      );
+      return NextResponse.json({
+        postgres_configured: true,
+        agents: result.rows,
+      });
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+  
   const results: Record<string, unknown> = {
     conway_api_url: CONWAY_API_URL,
     api_key_set: !!CONWAY_API_KEY,
@@ -112,16 +130,34 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'agentId and sandboxId required' }, { status: 400 });
     }
 
-    await query(
-      `UPDATE agents SET sandbox_id = $1 WHERE id = $2::uuid`,
+    // First check if agent exists
+    const checkResult = await query(
+      `SELECT id, sandbox_id FROM agents WHERE id = $1::uuid`,
+      [agentId]
+    );
+    
+    if (checkResult.rows.length === 0) {
+      return NextResponse.json({ error: `Agent ${agentId} not found` }, { status: 404 });
+    }
+    
+    const beforeSandbox = checkResult.rows[0].sandbox_id;
+
+    // Update sandbox_id
+    const updateResult = await query(
+      `UPDATE agents SET sandbox_id = $1 WHERE id = $2::uuid RETURNING id, sandbox_id`,
       [sandboxId, agentId]
     );
+
+    const afterSandbox = updateResult.rows[0]?.sandbox_id;
 
     return NextResponse.json({
       success: true,
       message: `Agent ${agentId} assigned to sandbox ${sandboxId}`,
+      before: beforeSandbox,
+      after: afterSandbox,
+      rowsAffected: updateResult.rows.length,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message, stack: error.stack }, { status: 500 });
   }
 }
