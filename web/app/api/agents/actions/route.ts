@@ -302,9 +302,14 @@ export async function POST(request: NextRequest) {
               const sandboxes = Array.isArray(data) ? data : data.sandboxes || [];
               // Find any usable sandbox - including "stale" which are just hibernated
               // and will wake up when we send commands to them
-              const usableSandbox = sandboxes.find((s: any) => 
-                (s.status === 'running' || s.status === 'ready' || s.status === 'active' || s.status === 'stale')
-              );
+              // PREFER sandboxes with more memory (need >=1GB for tsc build)
+              const usableSandboxes = sandboxes
+                .filter((s: any) => 
+                  (s.status === 'running' || s.status === 'ready' || s.status === 'active' || s.status === 'stale')
+                )
+                .sort((a: any, b: any) => (b.memory_mb || 512) - (a.memory_mb || 512));  // Most memory first
+              
+              const usableSandbox = usableSandboxes[0];  // Take the one with most memory
               if (usableSandbox) {
                 console.log(`[deploy] Using Conway sandbox directly: ${usableSandbox.id || usableSandbox.sandbox_id} (status: ${usableSandbox.status})`);
                 existingSandbox = {
@@ -406,18 +411,40 @@ export async function POST(request: NextRequest) {
         try {
           const agentDir = `/root/.automaton/agents/${agentId}`;
           
-          if (isNewSandbox) {
-            // 1. Install dependencies (only for new sandbox)
-            await execInSandbox(targetSandboxId, 'apt-get update -qq && apt-get install -y -qq nodejs npm git curl', 120000);
+          // Check if automaton is already built on this sandbox
+          const checkResult = await execInSandbox(targetSandboxId, 'ls /root/automaton/dist/index.js 2>/dev/null && echo "BUILT" || echo "NOT_BUILT"', 10000);
+          const alreadyBuilt = checkResult?.stdout?.includes('BUILT') || false;
+          
+          if (!alreadyBuilt) {
+            console.log(`[deploy] Building automaton on sandbox ${targetSandboxId}...`);
             
-            // 2. Clone AUTOMATON repo
-            await execInSandbox(targetSandboxId, `git clone --depth 1 ${AUTOMATON_REPO} /root/automaton`, 60000);
+            // 1. Install dependencies (only if not already present)
+            const nodeCheck = await execInSandbox(targetSandboxId, 'which node && which npm && which git', 5000);
+            if (!nodeCheck?.stdout?.includes('/usr/bin/node')) {
+              await execInSandbox(targetSandboxId, 'apt-get update -qq && apt-get install -y -qq nodejs npm git curl', 120000);
+            }
+            
+            // 2. Clone AUTOMATON repo if not present
+            const repoCheck = await execInSandbox(targetSandboxId, 'ls /root/automaton/package.json 2>/dev/null && echo "EXISTS" || echo "MISSING"', 5000);
+            if (!repoCheck?.stdout?.includes('EXISTS')) {
+              await execInSandbox(targetSandboxId, `rm -rf /root/automaton && git clone --depth 1 ${AUTOMATON_REPO} /root/automaton`, 60000);
+            }
             
             // 3. Install npm dependencies
-            await execInSandbox(targetSandboxId, 'cd /root/automaton && npm install --production', 120000);
+            await execInSandbox(targetSandboxId, 'cd /root/automaton && npm install', 180000);
             
-            // 4. Build TypeScript
-            await execInSandbox(targetSandboxId, 'cd /root/automaton && npm run build', 60000);
+            // 4. Build TypeScript (use npx tsc directly to avoid pnpm which may not be installed)
+            const buildResult = await execInSandbox(targetSandboxId, 'cd /root/automaton && npx tsc 2>&1', 120000);
+            if (buildResult?.exitCode !== 0) {
+              console.error('[deploy] TypeScript build may have failed:', buildResult?.stdout?.slice(-500));
+              // Check if dist was created despite errors
+              const distCheck = await execInSandbox(targetSandboxId, 'ls /root/automaton/dist/index.js 2>/dev/null && echo "OK"', 5000);
+              if (!distCheck?.stdout?.includes('OK')) {
+                throw new Error('TypeScript build failed - dist/index.js not created');
+              }
+            }
+          } else {
+            console.log(`[deploy] Sandbox ${targetSandboxId} already has automaton built`);
           }
 
           // 5. Create agent-specific directory
