@@ -70,6 +70,8 @@ export interface Agent {
   last_thought?: string;
   minimum_reply_cost?: number;
   reply_cost_asset?: string;
+  runtime_hours?: number;
+  last_payment_tx?: string;
 }
 
 export interface CreditDeposit {
@@ -129,6 +131,8 @@ export async function initDatabase() {
     try {
       await query(`ALTER TABLE agents ADD COLUMN IF NOT EXISTS minimum_reply_cost DECIMAL(18, 9) DEFAULT 0`);
       await query(`ALTER TABLE agents ADD COLUMN IF NOT EXISTS reply_cost_asset TEXT DEFAULT 'SOL'`);
+      await query(`ALTER TABLE agents ADD COLUMN IF NOT EXISTS runtime_hours INTEGER DEFAULT 0`);
+      await query(`ALTER TABLE agents ADD COLUMN IF NOT EXISTS last_payment_tx TEXT`);
     } catch (e) {
       // Ignore if columns exist or error (best effort migration)
       console.log('Migration note:', e);
@@ -596,6 +600,50 @@ export async function updateAgentThought(id: string, thought: string): Promise<b
   }
 }
 
+// Update agent survival status after compute payment
+export async function updateAgentSurvival(
+  agentId: string,
+  survivalData: {
+    survival_tier?: 'thriving' | 'normal' | 'endangered' | 'suspended';
+    sol_balance?: number;
+    runtime_hours?: number;
+    last_payment_tx?: string;
+  }
+): Promise<boolean> {
+  try {
+    const updates: string[] = ['last_heartbeat = NOW()'];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (survivalData.survival_tier !== undefined) {
+      updates.push(`survival_tier = $${paramIndex++}`);
+      params.push(survivalData.survival_tier);
+    }
+    if (survivalData.sol_balance !== undefined) {
+      updates.push(`sol_balance = $${paramIndex++}`);
+      params.push(survivalData.sol_balance);
+    }
+    if (survivalData.runtime_hours !== undefined) {
+      updates.push(`runtime_hours = $${paramIndex++}`);
+      params.push(survivalData.runtime_hours);
+    }
+    if (survivalData.last_payment_tx !== undefined) {
+      updates.push(`last_payment_tx = $${paramIndex++}`);
+      params.push(survivalData.last_payment_tx);
+    }
+
+    params.push(agentId);
+    await query(
+      `UPDATE agents SET ${updates.join(', ')} WHERE id = $${paramIndex}::uuid`,
+      params
+    );
+    return true;
+  } catch (error) {
+    console.error('[postgres] Failed to update agent survival:', error);
+    return false;
+  }
+}
+
 // Update agent status
 export async function updateAgentStatus(
   agentId: string,
@@ -607,6 +655,18 @@ export async function updateAgentStatus(
     
     if (status === 'running') {
       updates.push('started_at = CASE WHEN started_at IS NULL THEN NOW() ELSE started_at END');
+    }
+    
+    // When suspending, also set survival_tier and reset streak
+    if (status === 'suspended') {
+      updates.push(`survival_tier = 'suspended'`);
+      
+      // Reset streak in survival_stats
+      await query(`
+        UPDATE survival_stats 
+        SET current_streak = 0, longest_streak = GREATEST(longest_streak, current_streak)
+        WHERE agent_id = $1::uuid
+      `, [agentId]);
     }
     
     params.push(agentId);

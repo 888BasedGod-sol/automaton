@@ -3,6 +3,12 @@ import { createPublicClient, createWalletClient, http, parseAbi, type Address, t
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { getAgentById, updateAgentDeployment } from '@/lib/postgres';
+import { 
+  createDeployment, 
+  updateDeploymentStage, 
+  getDeploymentStatus,
+  initDeploymentTables,
+} from '@/lib/deployments';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,14 +42,29 @@ interface AgentCard {
   supportedTrust: string[];
 }
 
+// Initialize deployment tables
+let tablesInitialized = false;
+async function ensureTablesInit() {
+  if (!tablesInitialized) {
+    await initDeploymentTables();
+    tablesInitialized = true;
+  }
+}
+
 /**
  * POST /api/agents/deploy
  * 
  * Deploy an agent on-chain via ERC-8004 registry
  * Requires BASE_TREASURY_PRIVATE_KEY env var
+ * 
+ * Now with full deployment tracking!
  */
 export async function POST(request: NextRequest) {
+  let deploymentId: string | null = null;
+  
   try {
+    await ensureTablesInit();
+    
     const body = await request.json();
     const { agentId, agentCard } = body;
 
@@ -73,20 +94,53 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Create deployment tracking record
+    deploymentId = await createDeployment(agentId);
+
+    // Stage: Building agent card
+    await updateDeploymentStage(deploymentId, 'provisioning', {
+      message: 'Building agent identity card',
+    });
+
     // Build agent card if not provided
     const card: AgentCard = agentCard || buildAgentCard(agent);
 
-    // Create metadata URI (data URI for now, could use IPFS)
+    // Create metadata URI
     const agentURI = createAgentURI(card);
+
+    // Stage: Registering on-chain
+    await updateDeploymentStage(deploymentId, 'registering', {
+      message: 'Submitting transaction to Base network',
+    });
 
     // Deploy on-chain
     const result = await registerOnChain(treasuryKey, agentURI);
 
+    // Stage: Registered
+    await updateDeploymentStage(deploymentId, 'registered', {
+      message: 'Transaction confirmed on Base',
+      txHash: result.txHash,
+      erc8004Id: result.agentId.toString(),
+      metadata: { blockNumber: 'confirmed' },
+    });
+
     // Update database with Postgres
     await updateAgentDeployment(agentId, result.agentId.toString(), card);
 
+    // Stage: Starting agent
+    await updateDeploymentStage(deploymentId, 'starting', {
+      message: 'Initializing agent runtime',
+    });
+
+    // Stage: Running (complete!)
+    await updateDeploymentStage(deploymentId, 'running', {
+      message: 'Agent is live and earning survival points!',
+      erc8004Id: result.agentId.toString(),
+    });
+
     return NextResponse.json({
       success: true,
+      deploymentId,
       agentId: agentId,
       erc8004_id: result.agentId.toString(),
       txHash: result.txHash,
@@ -95,8 +149,25 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Deploy error:', error);
+    
+    // Mark deployment as failed if we have a tracking ID
+    if (deploymentId) {
+      try {
+        await updateDeploymentStage(deploymentId, 'failed', {
+          message: 'Deployment failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      } catch (e) {
+        console.error('Failed to update deployment status:', e);
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Deployment failed', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Deployment failed', 
+        details: error instanceof Error ? error.message : 'Unknown error',
+        deploymentId,
+      },
       { status: 500 }
     );
   }

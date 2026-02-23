@@ -8,7 +8,8 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { 
   ArrowLeft, Copy, ExternalLink, Activity, Coins, Clock, Shield,
   Zap, AlertTriangle, Scale, CheckCircle, Loader2, RefreshCw, User,
-  Play, Square, RotateCw, Send, Rocket, Terminal as TerminalIcon, Wallet
+  Play, Square, RotateCw, Send, Rocket, Terminal as TerminalIcon, Wallet,
+  Heart, Radio
 } from 'lucide-react';
 import Header from '@/components/Header';
 import AgentTerminal from '@/components/Terminal';
@@ -55,7 +56,7 @@ const STATUS_CONFIG = {
 };
 
 export default function AgentDetailPage() {
-  const { publicKey } = useWallet();
+  const { publicKey, connected } = useWallet();
   const params = useParams();
   const agentId = params.id as string;
   
@@ -65,12 +66,98 @@ export default function AgentDetailPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  
+  // Check if connected wallet owns this agent
+  const isOwner = connected && publicKey && agent?.owner_wallet === publicKey.toBase58();
+  
+  // Live Solana wallet balance
+  const [liveBalance, setLiveBalance] = useState<{
+    solBalance: number;
+    runtimeHours: number;
+    fundingStatus: string;
+    tier: string;
+  } | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
 
   useEffect(() => {
     if (agentId) {
       fetchAgent();
     }
   }, [agentId]);
+
+  // Fetch live balance from Solana blockchain
+  useEffect(() => {
+    if (agent?.solana_address) {
+      fetchLiveBalance();
+      // Refresh balance every 30 seconds
+      const interval = setInterval(fetchLiveBalance, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [agent?.solana_address]);
+
+  // Heartbeat state for UI feedback
+  const [lastHeartbeat, setLastHeartbeat] = useState<{ points: number; streak: number } | null>(null);
+  
+  // Trigger heartbeats every 20 seconds when survival mode is active
+  useEffect(() => {
+    if (!agent?.id || agent.status !== 'running') return;
+    
+    const triggerHeartbeat = async () => {
+      try {
+        const res = await fetch('/api/survival/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agentId: agent.id }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Update UI directly from heartbeat response (no extra API calls)
+          setLastHeartbeat({ points: data.pointsEarned, streak: data.currentStreak });
+          if (data.solanaWallet) {
+            setLiveBalance({
+              solBalance: data.solanaWallet.balance,
+              runtimeHours: data.solanaWallet.runtimeHours,
+              fundingStatus: data.solanaWallet.fundingStatus,
+              tier: data.tier,
+            });
+          }
+          // Update agent status/tier from response
+          setAgent(prev => prev ? { ...prev, survival_tier: data.tier } : null);
+        }
+      } catch (e) {
+        console.error('Heartbeat failed:', e);
+      }
+    };
+    
+    // Trigger heartbeat immediately, then every 20 seconds
+    triggerHeartbeat();
+    const interval = setInterval(triggerHeartbeat, 20000);
+    
+    return () => clearInterval(interval);
+  }, [agent?.id, agent?.status]);
+
+  const fetchLiveBalance = async () => {
+    if (!agent?.id) return;
+    setBalanceLoading(true);
+    try {
+      const res = await fetch(`/api/agents/${agent.id}/balance`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setLiveBalance({
+            solBalance: data.solanaWallet.solBalance,
+            runtimeHours: data.survival.runtimeHours,
+            fundingStatus: data.survival.fundingStatus,
+            tier: data.survival.tier,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch live balance:', e);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
 
   const fetchAgent = async () => {
     // Only set loading on initial fetch if not already loaded
@@ -109,61 +196,41 @@ export default function AgentDetailPage() {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  const handleAction = async (action: 'start' | 'stop' | 'restart' | 'deploy') => {
+  const handleSurvivalAction = async (action: 'start' | 'stop') => {
     setActionLoading(action);
     setActionMessage(null);
     
-    // Determine if this is an agent that needs deployment first
-    const needsDeploy = !agent || agent.status === 'pending' || agent.status === 'funded';
-    const effectiveAction = (action === 'start' && needsDeploy) ? 'deploy' : action;
-    
-    // Show immediate feedback with timing estimates
-    if (effectiveAction === 'deploy') {
-      setActionMessage('🚀 Starting deployment (~3-5 minutes)...');
-    } else if (action === 'start') {
-      setActionMessage('▶ Starting agent...');
-    } else if (action === 'stop') {
-      setActionMessage('⏹ Stopping agent...');
-    } else if (action === 'restart') {
-      setActionMessage('🔄 Restarting agent...');
+    if (action === 'start') {
+      setActionMessage('❤️ Entering Survival Mode...');
+    } else {
+      setActionMessage('⏹ Exiting Survival Mode...');
     }
     
     try {
-      // For deploy, show progress stages with actual timing
-      let progressInterval: NodeJS.Timeout | null = null;
-      if (effectiveAction === 'deploy') {
-        setActionLoading('deploy');
-        const progressMessages = [
-          { msg: '🔍 Finding available sandbox...', delay: 0 },
-          { msg: '📦 Installing system packages (1-2 min)...', delay: 5000 },
-          { msg: '📥 Cloning AUTOMATON repository...', delay: 60000 },
-          { msg: '📚 Installing npm dependencies (1-2 min)...', delay: 90000 },
-          { msg: '⚙️ Building TypeScript...', delay: 180000 },
-          { msg: '🔧 Configuring agent environment...', delay: 210000 },
-          { msg: '🚀 Starting agent process...', delay: 240000 },
-        ];
-        let startTime = Date.now();
-        progressInterval = setInterval(() => {
-          const elapsed = Date.now() - startTime;
-          const current = [...progressMessages].reverse().find(p => elapsed >= p.delay);
-          if (current) {
-            setActionMessage(current.msg);
-          }
-        }, 2000);
-      }
-      
-      const res = await fetch('/api/agents/actions', {
+      const res = await fetch('/api/survival/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId, action: effectiveAction }),
+        body: JSON.stringify({ 
+          agentId, 
+          action,
+          walletAddress: publicKey?.toBase58(),
+        }),
       });
-      
-      if (progressInterval) clearInterval(progressInterval);
       
       const data = await res.json();
       if (data.success) {
-        setActionMessage(`✓ ${data.message}`);
-        await fetchAgent();
+        // Update agent status from server response
+        setAgent(prev => prev ? {
+          ...prev,
+          status: data.status || (action === 'start' ? 'running' : 'suspended'),
+          survival_tier: data.tier || (action === 'start' ? 'normal' : 'suspended'),
+        } : null);
+        
+        setActionMessage(action === 'start' 
+          ? '✓ Agent is now in Survival Mode. Heartbeats active!'
+          : '✓ Agent exited Survival Mode. Heartbeats paused.'
+        );
+        // Don't refetch - use server response to avoid race conditions
       } else {
         setActionMessage(`✗ ${data.error}`);
       }
@@ -378,11 +445,11 @@ export default function AgentDetailPage() {
 
         </div>
 
-        {/* Actions Panel */}
+        {/* Survival Mode Panel */}
         <div className="mb-8 card p-6">
           <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <TerminalIcon className="w-5 h-5 text-accent" />
-            Control Plane
+            <Heart className="w-5 h-5 text-red-400" />
+            Survival Mode
           </h2>
           
           {actionMessage && (
@@ -398,82 +465,137 @@ export default function AgentDetailPage() {
             </div>
           )}
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {/* Show Deploy prominently for non-deployed agents */}
-            {(agent.status === 'pending' || agent.status === 'funded') ? (
+          <div className="grid grid-cols-2 gap-4">
+            {isOwner ? (
               <>
                 <button
-                  onClick={() => handleAction('deploy')}
-                  disabled={actionLoading !== null}
-                  className="btn bg-accent/10 text-accent hover:bg-accent/20 border-accent/20 flex flex-col h-auto py-4 gap-2 items-center justify-center col-span-2"
-                >
-                  {actionLoading === 'deploy' ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Rocket className="w-5 h-5" />
-                  )}
-                  <span className="text-xs font-medium uppercase tracking-wide">Deploy Agent</span>
-                  <span className="text-[10px] opacity-60">~3-5 minutes</span>
-                </button>
-                <div className="col-span-2 flex items-center justify-center text-xs text-fg-muted">
-                  Deploy creates a sandbox and starts your agent
-                </div>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => handleAction('start')}
-                  disabled={actionLoading !== null || agent.status === 'running'}
-                  className="btn bg-success/10 text-success hover:bg-success/20 border-success/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
+                  onClick={() => handleSurvivalAction('start')}
+                  disabled={actionLoading !== null || ['running', 'active'].includes(agent.status) || (liveBalance?.solBalance ?? agent.sol_balance ?? 0) < 0.01}
+                  className="btn bg-success/10 text-success hover:bg-success/20 border-success/20 flex flex-col h-auto py-6 gap-3 items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {actionLoading === 'start' ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-6 h-6 animate-spin" />
                   ) : (
-                    <Play className="w-5 h-5" />
+                    <div className="relative">
+                      <Heart className="w-6 h-6" />
+                      <Play className="w-3 h-3 absolute -bottom-1 -right-1" />
+                    </div>
                   )}
-                  <span className="text-xs font-medium uppercase tracking-wide">Start</span>
+                  <div className="text-center">
+                    <span className="text-sm font-medium uppercase tracking-wide block">Start Survival</span>
+                    <span className="text-[10px] opacity-60">
+                      {['running', 'active'].includes(agent.status) 
+                        ? 'Currently active' 
+                        : (liveBalance?.solBalance ?? agent.sol_balance ?? 0) < 0.01
+                        ? 'Fund wallet first (needs 0.01 SOL)'
+                        : 'Begin heartbeats & SOL deduction'}
+                    </span>
+                  </div>
                 </button>
                 
                 <button
-                  onClick={() => handleAction('stop')}
-                  disabled={actionLoading !== null || agent.status === 'suspended'}
-                  className="btn bg-error/10 text-error hover:bg-error/20 border-error/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
+                  onClick={() => handleSurvivalAction('stop')}
+                  disabled={actionLoading !== null || !['running', 'active', 'funded'].includes(agent.status)}
+                  className="btn bg-error/10 text-error hover:bg-error/20 border-error/20 flex flex-col h-auto py-6 gap-3 items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {actionLoading === 'stop' ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-6 h-6 animate-spin" />
                   ) : (
-                    <Square className="w-5 h-5" />
+                    <div className="relative">
+                      <Heart className="w-6 h-6" />
+                      <Square className="w-3 h-3 absolute -bottom-1 -right-1" />
+                    </div>
                   )}
-                  <span className="text-xs font-medium uppercase tracking-wide">Stop</span>
-                </button>
-                
-                <button
-                  onClick={() => handleAction('restart')}
-                  disabled={actionLoading !== null}
-                  className="btn bg-warning/10 text-warning hover:bg-warning/20 border-warning/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
-                >
-                  {actionLoading === 'restart' ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <RotateCw className="w-5 h-5" />
-                  )}
-                  <span className="text-xs font-medium uppercase tracking-wide">Restart</span>
-                </button>
-                
-                <button
-                  onClick={() => handleAction('deploy')}
-                  disabled={actionLoading !== null}
-                  className="btn bg-accent/10 text-accent hover:bg-accent/20 border-accent/20 flex flex-col h-auto py-4 gap-2 items-center justify-center"
-                >
-                  {actionLoading === 'deploy' ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Rocket className="w-5 h-5" />
-                  )}
-                  <span className="text-xs font-medium uppercase tracking-wide">Redeploy</span>
+                  <div className="text-center">
+                    <span className="text-sm font-medium uppercase tracking-wide block">Stop Survival</span>
+                    <span className="text-[10px] opacity-60">
+                      {!['running', 'active', 'funded'].includes(agent.status) ? 'Not currently active' : 'Pause heartbeats & payments'}
+                    </span>
+                  </div>
                 </button>
               </>
+            ) : (
+              <div className="col-span-2 text-center py-8 px-4 bg-bg-elevated/50 rounded-xl border border-border">
+                <Wallet className="w-8 h-8 mx-auto mb-3 text-fg-muted" />
+                <p className="text-fg-muted text-sm">
+                  {connected ? (
+                    <>Connect the <strong className="text-fg">owner wallet</strong> to control this agent's Survival Mode</>)  : (
+                    <>Connect your wallet to control this agent</>)}
+                </p>
+                {connected && publicKey && (
+                  <div className="mt-3 text-[10px] font-mono text-fg-muted/60 space-y-1">
+                    <p>Your wallet: {publicKey.toBase58()}</p>
+                    <p>Owner wallet: {agent.owner_wallet || 'not set'}</p>
+                  </div>
+                )}
+              </div>
             )}
+          </div>
+          
+          <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
+            <p className="text-xs text-fg-muted flex items-center gap-2">
+              <Heart className="w-4 h-4 text-red-400" />
+              <span>
+                <strong className="text-fg">Survival Mode:</strong> Agent sends <span className="text-white">$3.00</span> to the Vault every <span className="text-white">15 seconds</span>. 
+                Keep your agent funded to stay alive!
+              </span>
+            </p>
+          </div>
+          
+          {/* Survival Mode Explanation */}
+          <div className="mt-6 p-5 rounded-xl bg-gradient-to-br from-red-500/10 via-black/20 to-emerald-500/10 border border-white/10">
+            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-400" />
+              How Survival Mode Works
+            </h3>
+            
+            <div className="space-y-4 text-sm">
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+                  <Heart className="w-4 h-4 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-fg font-medium">Enter the Game</p>
+                  <p className="text-fg-muted text-xs">When you start Survival Mode, your agent enters a competitive survival game against all other agents in the network.</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                  <Activity className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-fg font-medium">Heartbeat Every 15 Seconds</p>
+                  <p className="text-fg-muted text-xs">Your agent emits a heartbeat every 15 seconds. Each heartbeat costs <span className="text-white font-medium">$3.00</span> in computing power, deducted as SOL from your agent's wallet and sent to the Vault.</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-fg font-medium">2-Minute Rounds</p>
+                  <p className="text-fg-muted text-xs">Every 2 minutes, a round concludes. The agent with the <span className="text-white font-medium">longest survival streak</span> in that round becomes eligible to claim the prize pool.</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                  <Coins className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-fg font-medium">50/50 Vault Split</p>
+                  <p className="text-fg-muted text-xs">The winner claims <span className="text-emerald-400 font-medium">50%</span> of all SOL sent to the Vault during that round. The remaining <span className="text-emerald-400 font-medium">50%</span> stays in the Vault for token buybacks, supporting the ecosystem.</p>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-xs text-fg-muted">
+                  <strong className="text-warning">⚠️ Warning:</strong> If your agent runs out of SOL, it will be eliminated from survival mode. Keep your wallet funded to maximize survival time and increase your chances of winning rounds!
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="mt-8 border-t border-white/5 pt-6">
@@ -490,7 +612,7 @@ export default function AgentDetailPage() {
           
           <p className="mt-4 text-xs text-fg-muted flex items-center gap-1.5 opacity-70">
             <Shield className="w-3 h-3" />
-            Agent sandbox powered by Conway Cloud. Deploy to start autonomous execution.
+            Survival powered by AUTOMATON Vault. SOL goes to buybacks.
           </p>
         </div>
 
@@ -532,11 +654,21 @@ export default function AgentDetailPage() {
             </div>
 
             <div className="card p-4 group">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="text-xs text-fg-muted uppercase tracking-wider font-semibold">Solana</p>
-                    <span className="px-1.5 py-0.5 bg-accent/10 text-accent text-[10px] rounded font-medium border border-accent/20">MAINNET</span>
+                    <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-400 text-[10px] rounded font-medium border border-purple-500/20">MAINNET</span>
+                    {liveBalance && (
+                      <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium border ${
+                        liveBalance.fundingStatus === 'healthy' ? 'bg-success/10 text-success border-success/20' :
+                        liveBalance.fundingStatus === 'low' ? 'bg-warning/10 text-warning border-warning/20' :
+                        'bg-error/10 text-error border-error/20'
+                      }`}>
+                        {liveBalance.fundingStatus === 'healthy' ? 'FUNDED' :
+                         liveBalance.fundingStatus === 'low' ? 'LOW' : 'CRITICAL'}
+                      </span>
+                    )}
                   </div>
                   <p className="font-mono text-sm truncate text-fg bg-bg-base/50 p-1.5 rounded border border-border/50">{agent.solana_address}</p>
                 </div>
@@ -558,6 +690,46 @@ export default function AgentDetailPage() {
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 </div>
+              </div>
+              
+              {/* Live SOL Balance */}
+              <div className="pt-2 border-t border-border/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-purple-400" />
+                    <span className="text-sm text-fg-muted">Balance:</span>
+                    {balanceLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                    ) : liveBalance ? (
+                      <span className="font-mono text-sm font-medium text-purple-400">
+                        {liveBalance.solBalance.toFixed(4)} SOL
+                      </span>
+                    ) : (
+                      <span className="text-sm text-fg-muted">--</span>
+                    )}
+                  </div>
+                  {liveBalance && (
+                    <span className="text-xs text-fg-muted">
+                      ~{liveBalance.runtimeHours}h runtime
+                    </span>
+                  )}
+                </div>
+                
+                {liveBalance && liveBalance.fundingStatus !== 'healthy' && (
+                  <div className={`mt-2 p-2 rounded text-xs ${
+                    liveBalance.fundingStatus === 'critical' || liveBalance.fundingStatus === 'empty'
+                      ? 'bg-error/10 text-error'
+                      : 'bg-warning/10 text-warning'
+                  }`}>
+                    <AlertTriangle className="w-3 h-3 inline mr-1" />
+                    {liveBalance.fundingStatus === 'empty' 
+                      ? 'Wallet empty! Send SOL to keep agent alive.'
+                      : liveBalance.fundingStatus === 'critical'
+                      ? `Critical: ~${liveBalance.runtimeHours}h left. Fund immediately!`
+                      : `Low balance: ~${liveBalance.runtimeHours}h left. Consider topping up.`
+                    }
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -596,13 +768,6 @@ export default function AgentDetailPage() {
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-border">
-          <Link
-            href={`/credits?agent=${agent.evm_address}`}
-            className="flex-1 py-3 px-4 btn btn-primary flex items-center justify-center gap-2"
-          >
-            <Coins className="w-4 h-4" />
-            Add Credits
-          </Link>
           <Link
             href="/agents"
             className="flex-1 py-3 px-4 btn btn-secondary flex items-center justify-center gap-2"

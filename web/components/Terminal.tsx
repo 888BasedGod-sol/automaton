@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Terminal as TerminalIcon, X, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
+import { Terminal as TerminalIcon, X, Maximize2, Minimize2, RefreshCw, Heart, Wallet, ExternalLink } from 'lucide-react';
 
 interface TerminalProps {
   agentId: string;
@@ -14,8 +14,10 @@ interface TerminalProps {
 interface LogLine {
   id: string;
   timestamp: string;
-  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'SYSTEM';
+  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'SYSTEM' | 'HEART';
   message: string;
+  txSignature?: string;
+  solAmount?: number;
 }
 
 export default function Terminal({ agentId, agentName, status, onClose }: TerminalProps) {
@@ -25,7 +27,7 @@ export default function Terminal({ agentId, agentName, status, onClose }: Termin
   const lastContentRef = useRef<string>('');
   
   // Helper to add log
-  const addLog = (level: LogLine['level'], message: string) => {
+  const addLog = (level: LogLine['level'], message: string, extra?: { txSignature?: string; solAmount?: number }) => {
     const now = new Date();
     const timeString = now.toISOString().split('T')[1].split('.')[0];
     
@@ -38,10 +40,67 @@ export default function Terminal({ agentId, agentName, status, onClose }: Termin
         id: Math.random().toString(36).substr(2, 9),
         timestamp: timeString,
         level,
-        message
+        message,
+        ...extra
       }];
     });
   };
+
+  // Track seen heartbeat transactions and survival state
+  const seenTxRef = useRef<Set<string>>(new Set());
+  const lastSurvivalRef = useRef<{ points: number; streak: number } | null>(null);
+
+  // Poll heartbeat transactions and survival stats
+  useEffect(() => {
+    const fetchHeartbeats = async () => {
+      try {
+        const res = await fetch(`/api/agents/${agentId}/heartbeats`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        // Show survival point gains
+        if (data.survival) {
+          const points = parseInt(data.survival.points) || 0;
+          const streak = data.survival.streak || 0;
+          const last = lastSurvivalRef.current;
+          
+          if (last) {
+            // Log point gains
+            if (points > last.points) {
+              const gain = points - last.points;
+              addLog('HEART', `♥ +${gain} SURVIVAL POINT${gain > 1 ? 'S' : ''} (Total: ${points}, Streak: ${streak})`);
+            }
+          } else if (points > 0) {
+            // First fetch - show current state
+            addLog('SYSTEM', `Survival Mode: ${points} points, ${streak} streak`);
+          }
+          
+          lastSurvivalRef.current = { points, streak };
+        }
+        
+        // Also show SOL transactions if any
+        if (data.transactions && Array.isArray(data.transactions)) {
+          // Process in reverse to show oldest first
+          [...data.transactions].reverse().forEach((tx: any) => {
+            if (!seenTxRef.current.has(tx.txSignature)) {
+              seenTxRef.current.add(tx.txSignature);
+              addLog(
+                'HEART',
+                `💸 HEARTBEAT → Vault | ${tx.solAmount.toFixed(6)} SOL ($${tx.usdAmount.toFixed(2)})`,
+                { txSignature: tx.txSignature, solAmount: tx.solAmount }
+              );
+            }
+          });
+        }
+      } catch (e) {
+        // Silent fail for heartbeats
+      }
+    };
+
+    fetchHeartbeats();
+    const interval = setInterval(fetchHeartbeats, 5000);
+    return () => clearInterval(interval);
+  }, [agentId]);
 
   // Initial status-based logs
   useEffect(() => {
@@ -82,14 +141,21 @@ export default function Terminal({ agentId, agentName, status, onClose }: Termin
     setLogs(initialLogs);
   }, [status, agentId, agentName]);
 
+  // Track log source for diagnostic display
+  const lastSourceRef = useRef<string>('');
+  const pollCountRef = useRef<number>(0);
+
   // Poll logs from sandbox when running
   useEffect(() => {
     if (status !== 'running') return;
 
     let isMounted = true;
+    pollCountRef.current = 0;
     
     const fetchLogs = async () => {
       if (!isMounted) return;
+      pollCountRef.current++;
+      
       try {
         const res = await fetch(`/api/agents/${agentId}/logs`);
         if (!res.ok) {
@@ -97,6 +163,20 @@ export default function Terminal({ agentId, agentName, status, onClose }: Termin
           return;
         }
         const data = await res.json();
+        
+        // Show log source on first fetch or when it changes
+        const source = data.source || 'unknown';
+        if (source !== lastSourceRef.current) {
+          lastSourceRef.current = source;
+          if (source === 'sandbox') {
+            addLog('SYSTEM', `Connected to sandbox ${data.sandboxId?.slice(0, 8) || ''}`);
+          } else if (source === 'database') {
+            const reason = data.reason ? ` (${data.reason})` : '';
+            addLog('SYSTEM', `Reading from database${reason}`);
+          } else if (source === 'sandbox-error') {
+            addLog('WARN', 'Sandbox connection issue - showing cached data');
+          }
+        }
         
         // Show process state if available
         if (data.processState && data.processState !== 'RUNNING') {
@@ -132,6 +212,12 @@ export default function Terminal({ agentId, agentName, status, onClose }: Termin
         } else if (thought === 'No logs yet' && lastContentRef.current !== 'No logs yet') {
           lastContentRef.current = thought;
           addLog('SYSTEM', 'Agent started, waiting for output...');
+        } else if (!thought && pollCountRef.current <= 2) {
+          // Show waiting message on first few polls if no data
+          if (lastContentRef.current !== 'waiting') {
+            lastContentRef.current = 'waiting';
+            addLog('SYSTEM', 'Waiting for agent output...');
+          }
         }
       } catch (e: any) {
         addLog('ERROR', `Poll error: ${e.message}`);
@@ -209,10 +295,24 @@ export default function Terminal({ agentId, agentName, status, onClose }: Termin
               ${log.level === 'ERROR' ? 'text-red-400' : ''}
               ${log.level === 'DEBUG' ? 'text-gray-500' : ''}
               ${log.level === 'SYSTEM' ? 'text-accent' : ''}
+              ${log.level === 'HEART' ? 'text-red-400' : ''}
             `}>
-              {log.level}
+              {log.level === 'HEART' ? '♥' : log.level}
             </span>
-            <span className="text-gray-300 break-all">{log.message}</span>
+            <span className="text-gray-300 break-all">
+              {log.message}
+              {log.txSignature && (
+                <a
+                  href={`https://solscan.io/tx/${log.txSignature}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-2 text-accent hover:underline inline-flex items-center gap-1"
+                >
+                  <ExternalLink className="w-3 h-3 inline" />
+                  <span className="font-mono text-xs">{log.txSignature.slice(0, 8)}...</span>
+                </a>
+              )}
+            </span>
           </div>
         ))}
         

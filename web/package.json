@@ -8,6 +8,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "npx tsx scripts/test-systems.ts",
+    "test:json": "npx tsx scripts/test-systems.ts --json",
+    "review": "npx tsx scripts/claude-review.ts",
+    "review:api": "npx tsx scripts/claude-review.ts --focus=api",
+    "review:components": "npx tsx scripts/claude-review.ts --focus=components",
     "funding-monitor": "npx tsx scripts/funding-monitor.ts"
   },
   "keywords": [

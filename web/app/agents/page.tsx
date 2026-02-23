@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Header from '@/components/Header';
 import AgentCard from '@/components/AgentCard';
+import { useAgents } from '@/lib/hooks/use-realtime';
 
 interface Agent {
   id: string;
@@ -44,9 +45,11 @@ interface OnChainAgent {
 }
 
 export default function AgentsPage() {
-  const [agents, setAgents] = useState<Agent[]>([]);
+  // Real-time agents data - auto-refreshes every 10 seconds
+  const { data: agentsData, isLoading: loading } = useAgents();
+  const agents = agentsData?.agents || [];
+  
   const [onchainAgents, setOnchainAgents] = useState<OnChainAgent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [onchainLoading, setOnchainLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState<string>('all');
@@ -54,22 +57,8 @@ export default function AgentsPage() {
   const [sortBy, setSortBy] = useState<'newest' | 'credits' | 'uptime'>('newest');
 
   useEffect(() => {
-    fetchAgents();
     fetchOnchainAgents();
   }, []);
-
-  const fetchAgents = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/agents/all');
-      const data = await res.json();
-      setAgents(data.agents || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchOnchainAgents = async () => {
     setOnchainLoading(true);

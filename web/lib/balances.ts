@@ -89,3 +89,140 @@ export function hasMinimumFunding(balances: Balances): boolean {
   const totalUsdc = balances.solanaUsdc + balances.baseUsdc;
   return totalUsdc >= 1 || balances.sol >= 0.01;
 }
+
+// Token mints for price fetching
+const SOL_MINT = 'So11111111111111111111111111111111111111112';
+const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+// Price cache (5 minute TTL)
+let cachedSolPrice: number | null = null;
+let priceLastFetched: number = 0;
+const PRICE_CACHE_TTL_MS = 1 * 60 * 1000; // 1 minute
+
+// Runtime cost - $1/hour for simple math
+const HOURLY_COST_USD = 1.00; // Cost per hour of runtime
+
+/**
+ * Fetch real-time SOL price in USDC from Jupiter Price API
+ */
+export async function getSolPrice(): Promise<number> {
+  const now = Date.now();
+  
+  // Return cached price if still valid
+  if (cachedSolPrice !== null && (now - priceLastFetched) < PRICE_CACHE_TTL_MS) {
+    return cachedSolPrice;
+  }
+  
+  try {
+    const response = await fetch(
+      `https://price.jup.ag/v6/price?ids=${SOL_MINT}&vsToken=${USDC_MINT}`
+    );
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch SOL price from Jupiter');
+    }
+    
+    const data = await response.json();
+    const price = data.data?.[SOL_MINT]?.price;
+    
+    if (!price || typeof price !== 'number') {
+      throw new Error('Invalid price data from Jupiter');
+    }
+    
+    // Update cache
+    cachedSolPrice = price;
+    priceLastFetched = now;
+    
+    return price;
+  } catch (error) {
+    // If we have a cached price, use it as fallback
+    if (cachedSolPrice !== null) {
+      console.warn('Failed to fetch SOL price, using cached value:', cachedSolPrice);
+      return cachedSolPrice;
+    }
+    // Last resort fallback - Feb 2026 estimate
+    return 170;
+  }
+}
+
+/**
+ * Convert SOL balance to estimated runtime hours
+ * @param solBalance - SOL amount
+ * @param solPriceUsdc - Current SOL price in USDC
+ */
+export function solToRuntimeHours(solBalance: number, solPriceUsdc: number): number {
+  const usdValue = solBalance * solPriceUsdc;
+  return Math.floor(usdValue / HOURLY_COST_USD);
+}
+
+/**
+ * Convert SOL to runtime hours using live price
+ */
+export async function solToRuntimeHoursAsync(solBalance: number): Promise<number> {
+  const price = await getSolPrice();
+  return solToRuntimeHours(solBalance, price);
+}
+
+/**
+ * Convert runtime hours to required SOL
+ * @param hours - Number of hours
+ * @param solPriceUsdc - Current SOL price in USDC
+ */
+export function runtimeHoursToSol(hours: number, solPriceUsdc: number): number {
+  const usdRequired = hours * HOURLY_COST_USD;
+  return usdRequired / solPriceUsdc;
+}
+
+/**
+ * Determine survival tier based on SOL balance
+ * @param solBalance - SOL amount
+ * @param solPriceUsdc - Current SOL price in USDC
+ */
+export function getSurvivalTierFromBalance(solBalance: number, solPriceUsdc: number): 'thriving' | 'normal' | 'endangered' | 'suspended' {
+  const runtimeHours = solToRuntimeHours(solBalance, solPriceUsdc);
+  
+  if (runtimeHours >= 72) return 'thriving';      // 3+ days
+  if (runtimeHours >= 24) return 'normal';        // 1-3 days
+  if (runtimeHours >= 6) return 'endangered';     // 6-24 hours
+  return 'suspended';                              // <6 hours
+}
+
+/**
+ * Get survival tier using live price
+ */
+export async function getSurvivalTierFromBalanceAsync(solBalance: number): Promise<'thriving' | 'normal' | 'endangered' | 'suspended'> {
+  const price = await getSolPrice();
+  return getSurvivalTierFromBalance(solBalance, price);
+}
+
+/**
+ * Get credits equivalent from SOL balance (1 credit = 1 USDC)
+ * @param solBalance - SOL amount
+ * @param solPriceUsdc - Current SOL price in USDC
+ */
+export function solToCredits(solBalance: number, solPriceUsdc: number): number {
+  return solBalance * solPriceUsdc;
+}
+
+/**
+ * Get credits using live price
+ */
+export async function solToCreditsAsync(solBalance: number): Promise<number> {
+  const price = await getSolPrice();
+  return solToCredits(solBalance, price);
+}
+
+/**
+ * Get quick SOL balance check for a single address
+ */
+export async function getSolBalance(address: string): Promise<number> {
+  try {
+    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    const pubkey = new PublicKey(address);
+    const balance = await connection.getBalance(pubkey);
+    return balance / 1e9;
+  } catch (error) {
+    console.error('Error fetching SOL balance:', error);
+    return 0;
+  }
+}

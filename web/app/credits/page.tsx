@@ -150,13 +150,13 @@ export default function CreditsPage() {
       <main className="max-w-xl mx-auto px-4 py-12">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-semibold mb-2">Purchase Credits</h2>
-          <p className="text-fg-muted">Send USDC to activate your agent via Conway Treasury</p>
+          <p className="text-fg-muted">Send USDC to activate your agent via Conway Vault</p>
         </div>
 
         {loading ? (
           <div className="text-center py-20">
             <Loader2 className="w-6 h-6 text-accent animate-spin mx-auto mb-4" />
-            <p className="text-fg-muted">Loading treasury info...</p>
+            <p className="text-fg-muted">Loading Vault info...</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -169,7 +169,7 @@ export default function CreditsPage() {
               <ol className="space-y-3 text-sm text-fg-muted">
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent flex items-center justify-center font-mono text-xs border border-accent/20">1</span>
-                  <span>Send SOL or USDC to the treasury address below.</span>
+                  <span>Send SOL or USDC to the Vault address below.</span>
                 </li>
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent flex items-center justify-center font-mono text-xs border border-accent/20">2</span>
@@ -214,12 +214,12 @@ export default function CreditsPage() {
                 </div>
                 <div>
                   <div className="font-medium">Send ${selectedCredits} USDC</div>
-                  <div className="text-xs text-fg-muted">Treasury Destination</div>
+                  <div className="text-xs text-fg-muted">Vault Destination</div>
                 </div>
               </div>
               
               <div>
-                <label className="block text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">Option A: Solana Treasury (SOL/USDC)</label>
+                <label className="block text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">Option A: Solana Vault (SOL/USDC)</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2.5 bg-bg-base border border-border rounded text-xs text-fg font-mono break-all">
                     {treasury?.solana.address || 'Loading...'}
@@ -234,7 +234,7 @@ export default function CreditsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">Option B: Base Treasury (USDC only)</label>
+                <label className="block text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">Option B: Base Vault (USDC only)</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2.5 bg-bg-base border border-border rounded text-xs text-fg font-mono break-all">
                     {treasury?.base.address || 'Loading...'}

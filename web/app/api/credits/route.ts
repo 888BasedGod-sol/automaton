@@ -13,6 +13,7 @@ import {
   initDatabase,
   updateDepositStatus
 } from '@/lib/postgres';
+import { updateDeploymentStage, getActiveDeployment } from '@/lib/deployments';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -125,6 +126,19 @@ async function addConwayCredits(
           amountUsdc, // Postgres stores credits as decimal (1 credit = $1)
           'funded'    // Update status to funded if not already
         );
+        
+        // Update deployment stage to 'funded' if there's an active deployment
+        try {
+          const activeDeployment = await getActiveDeployment(agent.id);
+          if (activeDeployment && ['created', 'funding'].includes(activeDeployment.stage)) {
+            await updateDeploymentStage(agent.id, 'funded', {
+              message: `Received ${amountUsdc} USDC funding`,
+            });
+          }
+        } catch (deployErr) {
+          console.error('[Credits API] Failed to update deployment stage:', deployErr);
+          // Don't fail the credit add if deployment tracking fails
+        }
         
         console.log(`[Credits API] Added ${amountUsdc} credits to agent ${agent.id} (DB update)`);
         return {

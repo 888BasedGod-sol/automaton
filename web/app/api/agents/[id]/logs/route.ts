@@ -94,11 +94,23 @@ export async function GET(
       }
     }
     
-    // Fallback to database logs
+    // Fallback to database logs - provide diagnostic info
+    let reason = '';
+    if (!row.sandbox_id) {
+      reason = 'No sandbox deployed';
+    } else if (row.status !== 'running') {
+      reason = `Agent status: ${row.status}`;
+    } else if (!CONWAY_API_KEY) {
+      reason = 'Conway API not configured';
+    }
+    
     return NextResponse.json({
-      thought: row.last_thought,
+      thought: row.last_thought || '',
       timestamp: row.last_heartbeat,
       source: 'database',
+      reason,
+      sandboxId: row.sandbox_id || null,
+      agentStatus: row.status,
       success: true
     }, {
       headers: {

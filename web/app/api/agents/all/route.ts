@@ -63,6 +63,9 @@ function convertRegistryAgent(regAgent: RegistryAgent): any {
         id: `erc8004-${regAgent.tokenId}`,
         name: regAgent.name,
         genesis_prompt: regAgent.description || 'On-chain agent from Base registry.',
+        evm_address: regAgent.owner || null,
+        solana_address: null,
+        owner_wallet: regAgent.owner || null,
         status: 'active', // Assume active if on-chain
         survival_tier: 'registering', // assume thriving
         credits_balance: 0, // Unknown

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { 
   Menu, X, Cpu, Zap, 
   LayoutDashboard, Network, MessageSquare, Users,
-  ChevronRight
+  ChevronRight, Trophy
 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import dynamic from 'next/dynamic';
@@ -38,6 +38,7 @@ export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
 
   const navLinks = [
     { href: '/agents', label: 'Directory', icon: Users },
+    { href: '/survival', label: 'Survival', icon: Trophy },
     { href: '/network', label: 'Network', icon: Network },
     { href: '/dashboard', label: 'My Fleet', icon: LayoutDashboard },
   ];

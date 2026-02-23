@@ -12,6 +12,7 @@ import {
   getSandboxById,
   upsertSandbox
 } from '@/lib/postgres';
+import { payForCompute, estimateComputePayment, getTreasuryAddress } from '@/lib/compute-payment';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,9 +101,11 @@ async function execInSandbox(sandboxId: string, command: string, timeoutMs = 300
 
 interface AgentActionRequest {
   agentId: string;
-  action: 'start' | 'stop' | 'restart' | 'deploy' | 'fund';
+  action: 'start' | 'stop' | 'restart' | 'deploy' | 'fund' | 'pay_compute';
   sandboxId?: string;
   amount?: number;
+  hours?: number; // For pay_compute action
+  payAll?: boolean; // Pay all available balance
 }
 
 export async function POST(request: NextRequest) {
@@ -555,6 +558,59 @@ tasks:
           success: true,
           message: 'Funding requires wallet connection',
           fundingAddress: null,
+        });
+      }
+
+      case 'pay_compute': {
+        // Agent self-payment: send SOL from agent wallet to treasury
+        if (!isPostgresConfigured()) {
+          return NextResponse.json(
+            { success: false, error: 'Database not configured' },
+            { status: 500 }
+          );
+        }
+
+        const agentData = await getAgentWithKeys(agentId);
+        if (!agentData) {
+          return NextResponse.json(
+            { success: false, error: 'Agent not found' },
+            { status: 404 }
+          );
+        }
+
+        if (!agentData.solana_private_key) {
+          return NextResponse.json(
+            { success: false, error: 'Agent has no Solana wallet configured' },
+            { status: 400 }
+          );
+        }
+
+        const hours = body.hours || 1;
+        const payAll = body.payAll || false;
+
+        // Execute the payment
+        const result = await payForCompute(agentData.solana_private_key, {
+          hours,
+          payAll,
+        });
+
+        if (!result.success) {
+          return NextResponse.json(
+            { success: false, error: result.error },
+            { status: 400 }
+          );
+        }
+
+        console.log(`[pay_compute] Agent ${agentId} paid ${result.amountPaid.toFixed(6)} SOL for ${result.hoursPayedFor} hours of compute`);
+
+        return NextResponse.json({
+          success: true,
+          message: `Paid ${result.amountPaid.toFixed(6)} SOL for ${result.hoursPayedFor} hours of compute`,
+          txSignature: result.txSignature,
+          amountPaid: result.amountPaid,
+          hoursPayedFor: result.hoursPayedFor,
+          newBalance: result.newBalance,
+          treasuryAddress: getTreasuryAddress(),
         });
       }
 

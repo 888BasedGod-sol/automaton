@@ -167,6 +167,53 @@ input::placeholder, textarea::placeholder {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
+/* Shimmer animation for loading states */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.shimmer {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 100%
+  );
+}
+
+/* Toast animations */
+@keyframes toast-in {
+  0% { 
+    opacity: 0; 
+    transform: translateX(100%) scale(0.95);
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  0% { 
+    opacity: 1; 
+    transform: translateX(0) scale(1);
+  }
+  100% { 
+    opacity: 0; 
+    transform: translateX(100%) scale(0.95);
+  }
+}
+
+.toast-enter {
+  animation: toast-in 0.3s ease-out forwards;
+}
+
+.toast-exit {
+  animation: toast-out 0.2s ease-in forwards;
+}
+
 /* Wallet adapter overrides */
 .wallet-adapter-button {
   background: var(--accent) !important;
@@ -197,4 +244,14 @@ input::placeholder, textarea::placeholder {
 
 .wallet-adapter-modal-list li:hover {
   background: var(--bg-elevated) !important;
+}
+
+/* Heartbeat flow animation */
+@keyframes flowRight {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
 }

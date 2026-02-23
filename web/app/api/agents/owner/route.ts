@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       genesis_prompt: agent.genesis_prompt,
       evm_address: agent.evm_address,
       solana_address: agent.solana_address,
+      owner_wallet: agent.owner_wallet,
       status: agent.status,
       survival_tier: agent.survival_tier,
       credits_balance: agent.credits_balance,

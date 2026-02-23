@@ -13,6 +13,7 @@ import AgentCardSkeleton from '@/components/AgentCardSkeleton';
 import TerminalFeed from '@/components/TerminalFeed';
 import NetworkBackground from '@/components/NetworkBackground';
 import BootScreen from '@/components/BootScreen';
+import { useAgents, REFRESH_INTERVALS } from '@/lib/hooks/use-realtime';
 
 interface Agent {
   id: string;
@@ -25,45 +26,25 @@ interface Agent {
 }
 
 export default function HomePage() {
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [booted, setBooted] = useState(false);
-  const [stats, setStats] = useState({
-    activeAgents: 0,
-    totalTransactions: 0,
-    networkRevenue: 0,
-  });
+  
+  // Real-time agents data - auto-refreshes every 10 seconds
+  const { data: agentsData, isLoading: loading } = useAgents();
+  const agents = agentsData?.agents || [];
+  
+  // Calculate stats from real-time data
+  const active = agents.filter((a: Agent) => 
+    a.status === 'running' || a.status === 'active'
+  ).length;
+  
+  const totalCredits = agents.reduce((acc: number, a: Agent) => 
+    acc + (a.creditsBalance || a.credits_balance || 0), 0
+  );
 
-  useEffect(() => {
-    fetchAgents();
-  }, []);
-
-
-  const fetchAgents = async () => {
-    try {
-      const res = await fetch('/api/agents/all');
-      const data = await res.json();
-      const agentList = data.agents || [];
-      setAgents(agentList);
-      
-      const active = agentList.filter((a: Agent) => 
-        a.status === 'running' || a.status === 'active'
-      ).length;
-      
-      const totalCredits = agentList.reduce((acc: number, a: Agent) => 
-        acc + (a.creditsBalance || a.credits_balance || 0), 0
-      );
-
-      setStats({
-        activeAgents: active,
-        totalTransactions: 12543 + active * 42, // Simulated historical data + live
-        networkRevenue: totalCredits,
-      });
-    } catch (e) {
-      console.error('Failed to fetch agents:', e);
-    } finally {
-      setLoading(false);
-    }
+  const stats = {
+    activeAgents: active,
+    totalTransactions: 12543 + active * 42,
+    networkRevenue: totalCredits,
   };
 
   return (

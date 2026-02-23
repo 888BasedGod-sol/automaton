@@ -3,6 +3,7 @@
 import { FC, ReactNode } from 'react';
 import WalletProvider from './WalletProvider';
 import { EvmProvider } from './EvmProvider';
+import { ToastProvider } from './Toast';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -12,7 +13,9 @@ export const Providers: FC<ProvidersProps> = ({ children }) => {
   return (
     <EvmProvider>
       <WalletProvider>
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </WalletProvider>
     </EvmProvider>
   );

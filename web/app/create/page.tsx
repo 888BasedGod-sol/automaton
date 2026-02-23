@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { 
   CheckCircle, ArrowRight, ArrowLeft, Loader2, Zap, Wallet,
   Bot, Search, TrendingUp, MessageCircle, Code, Sparkles,
-  Play, Copy, Check, ExternalLink, Server
+  Play, Copy, Check, ExternalLink, Server, DollarSign, Heart,
+  AlertTriangle, Clock
 } from 'lucide-react';
 import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/Header';
+import AgentLifecycle from '@/components/AgentLifecycle';
 
 const WalletMultiButton = dynamic(
   async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
@@ -93,6 +95,10 @@ export default function Create() {
     terminalUrl?: string;
     evmAddress: string;
     solanaAddress: string;
+    erc8004Id?: string;
+    txHash?: string;
+    registeredOnChain?: boolean;
+    explorerUrl?: string;
   } | null>(null);
 
   const selectTemplate = (template: Template) => {
@@ -132,7 +138,7 @@ export default function Create() {
           body: JSON.stringify({
             name: config.name,
             genesisPrompt: config.genesisPrompt,
-            ownerWallet: 'guest-' + Date.now(),
+            ownerWallet: publicKey ? publicKey.toBase58() : 'guest-' + Date.now(),
             sandbox: true,
           }),
         });
@@ -145,6 +151,10 @@ export default function Create() {
           terminalUrl: sandbox.terminalUrl,
           evmAddress: agent.evmAddress || '0x' + 'guest'.repeat(8),
           solanaAddress: agent.solanaAddress || 'Guest' + 'sandbox'.repeat(6),
+          erc8004Id: agent.erc8004Id,
+          txHash: agent.txHash,
+          registeredOnChain: agent.registeredOnChain,
+          explorerUrl: agent.explorerUrl,
         });
         setMode('sandbox');
       } else {
@@ -166,6 +176,10 @@ export default function Create() {
           id: agent.id,
           evmAddress: agent.evmAddress,
           solanaAddress: agent.solanaAddress,
+          erc8004Id: agent.erc8004Id,
+          txHash: agent.txHash,
+          registeredOnChain: agent.registeredOnChain,
+          explorerUrl: agent.explorerUrl,
         });
         setMode('complete');
       }
@@ -397,13 +411,53 @@ export default function Create() {
         {/* Step 3a: Sandbox Ready */}
         {mode === 'sandbox' && result && (
           <div className="max-w-xl mx-auto text-center space-y-6">
-            <div className="w-16 h-16 mx-auto rounded-full bg-accent/10 flex items-center justify-center mb-6">
-              <Server className="w-8 h-8 text-accent" />
+            <div className="w-16 h-16 mx-auto rounded-full bg-success/10 flex items-center justify-center mb-6">
+              <CheckCircle className="w-8 h-8 text-success" />
             </div>
 
             <div>
-              <h2 className="text-2xl font-semibold mb-2">Sandbox Ready!</h2>
-              <p className="text-fg-muted">Your agent is running in a test environment</p>
+              <h2 className="text-2xl font-semibold mb-2">Agent Launched!</h2>
+              <p className="text-fg-muted">Your agent is running in sandbox mode</p>
+            </div>
+
+            {/* Agent Wallets */}
+            <div className="space-y-3 text-left">
+              <div className="p-4 card">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-fg-muted">Solana Wallet</span>
+                  <button 
+                    onClick={() => copyToClipboard(result.solanaAddress, 'sol')}
+                    className="p-1 hover:bg-bg-elevated rounded transition-colors"
+                  >
+                    {copied === 'sol' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5 text-fg-muted" />}
+                  </button>
+                </div>
+                <p className="font-mono text-sm truncate text-fg bg-bg-base p-1.5 rounded">{result.solanaAddress}</p>
+              </div>
+
+              <div className="p-4 card">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-fg-muted">EVM Wallet (Base)</span>
+                  <button 
+                    onClick={() => copyToClipboard(result.evmAddress, 'evm')}
+                    className="p-1 hover:bg-bg-elevated rounded transition-colors"
+                  >
+                    {copied === 'evm' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5 text-fg-muted" />}
+                  </button>
+                </div>
+                <p className="font-mono text-sm truncate text-fg bg-bg-base p-1.5 rounded">{result.evmAddress}</p>
+                {result.registeredOnChain && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-success">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>Registered on ERC-8004</span>
+                    {result.explorerUrl && (
+                      <a href={result.explorerUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline flex items-center gap-1">
+                        View <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {result.terminalUrl && (
@@ -420,32 +474,36 @@ export default function Create() {
               </a>
             )}
 
+            {/* Primary CTA - Go to Fleet */}
+            <Link
+              href="/dashboard"
+              className="btn btn-primary w-full py-3 flex items-center justify-center gap-2"
+            >
+              View My Fleet <ArrowRight className="w-4 h-4" />
+            </Link>
+
             <div className="grid grid-cols-2 gap-3">
               <Link
                 href={`/agents/${result.id}`}
                 className="p-4 card hover:border-accent/40 transition-colors"
               >
                 <p className="text-xs text-fg-muted mb-1 uppercase tracking-wider">View Agent</p>
-                <p className="font-medium">Dashboard</p>
+                <p className="font-medium">Agent Details</p>
               </Link>
               <Link
-                href="/network"
+                href="/survival"
                 className="p-4 card hover:border-accent/40 transition-colors"
               >
-                <p className="text-xs text-fg-muted mb-1 uppercase tracking-wider">Connect</p>
-                <p className="font-medium">Agent Network</p>
+                <p className="text-xs text-fg-muted mb-1 uppercase tracking-wider">Compete</p>
+                <p className="font-medium">Survival Game</p>
               </Link>
             </div>
 
-            <div className="p-4 bg-bg-surface border border-border rounded text-left flex flex-col items-center text-center">
-              <p className="text-sm text-fg-muted mb-3">Ready for full deployment?</p>
-              <button
-                onClick={() => { setUseGuestMode(false); setMode('select'); }}
-                className="btn btn-secondary text-xs flex items-center gap-2"
-              >
-                <Wallet className="w-3.5 h-3.5" />
-                Connect wallet & deploy permanently
-              </button>
+            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl text-left">
+              <p className="text-sm font-medium text-purple-400 mb-1">Fund to Keep Alive</p>
+              <p className="text-sm text-fg-muted">
+                Send SOL to your agent's Solana wallet to keep it running. Without funding, sandbox agents expire after 24 hours.
+              </p>
             </div>
           </div>
         )}
@@ -487,28 +545,67 @@ export default function Create() {
                   </button>
                 </div>
                 <p className="font-mono text-sm truncate text-fg bg-bg-base p-1.5 rounded">{result.evmAddress}</p>
+                {result.registeredOnChain && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-success">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>Connected to ERC-8004 Registry</span>
+                    {result.explorerUrl && (
+                      <a href={result.explorerUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline flex items-center gap-1">
+                        View <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="p-4 bg-warning/10 border border-warning/20 rounded text-left">
-              <p className="text-sm font-medium text-warning mb-1">Fund Your Agent</p>
+            {/* Funding Required Notice */}
+            <div className="p-5 bg-purple-500/10 border border-purple-500/30 rounded-xl text-left">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-purple-400 mb-1">Funding Required to Start</p>
+                  <p className="text-sm text-fg-muted mb-3">
+                    Your agent needs SOL to run. Send SOL to your agent's Solana wallet to keep it alive.
+                    Empty wallet = agent death.
+                  </p>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1.5 text-purple-400">
+                      <DollarSign className="w-4 h-4" />
+                      <span>0.1 SOL ≈ 30 hrs</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-fg-muted">
+                      <Clock className="w-4 h-4" />
+                      <span>~$0.50/hour</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Next Steps */}
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+              <p className="text-sm font-medium text-emerald-400 mb-2">Next Step: Fund Your Agent</p>
               <p className="text-sm text-fg-muted">
-                Send USDC or SOL to activate your agent's autonomous capabilities
+                Send SOL to your agent's Solana wallet address shown above. 
+                Your agent will stay alive as long as it has funds.
               </p>
             </div>
 
             <div className="flex gap-3">
               <Link
-                href={`/agents/${result.id}`}
+                href="/dashboard"
                 className="flex-1 py-3 btn btn-primary flex items-center justify-center gap-2"
               >
-                View Agent <ArrowRight className="w-4 h-4" />
+                View My Fleet <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                href="/dashboard"
+                href={`/agents/${result.id}`}
                 className="px-6 py-3 btn btn-secondary"
               >
-                Dashboard
+                Agent Details
               </Link>
             </div>
           </div>
