@@ -1,19 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
-
+import dynamic from 'next/dynamic';
 import { 
-  ArrowLeft, Copy, ExternalLink, Activity, Coins, Clock, Shield,
+  Copy, ExternalLink, Activity, Coins, Clock, Shield,
   Zap, AlertTriangle, Scale, CheckCircle, Loader2, RefreshCw, User,
-  Play, Square, RotateCw, Send, Rocket, Terminal as TerminalIcon, Wallet,
-  Heart, Radio
+  Play, Square, Terminal as TerminalIcon, Wallet,
+  Heart, ChevronDown, ChevronUp, ArrowLeft, Bot,
+  Cpu, Power, Radio, Signal, Database, Gauge, Check
 } from 'lucide-react';
 import Header from '@/components/Header';
-import AgentTerminal from '@/components/Terminal';
 import AgentDetailSkeleton from '@/components/AgentDetailSkeleton';
+import useSWR from 'swr';
+
+const fetcher = (url: string) => fetch(url).then(r => r.json());
+
+// Dynamically import Terminal to avoid SSR issues
+const AgentTerminal = dynamic(() => import('@/components/Terminal'), { ssr: false });
 
 interface Agent {
   id: string;
@@ -33,6 +39,8 @@ interface Agent {
   skills: string[] | string;
   created_at: string;
   uptime_seconds: number;
+  last_thought?: string;
+  erc8004_id?: string;
   stats?: {
     followers: number;
     following: number;
@@ -41,23 +49,16 @@ interface Agent {
 }
 
 const TIER_CONFIG = {
-  thriving: { color: 'text-success', bg: 'bg-success/10', icon: Zap },
-  normal: { color: 'text-warning', bg: 'bg-warning/10', icon: Scale },
-  endangered: { color: 'text-error', bg: 'bg-error/10', icon: AlertTriangle },
-  suspended: { color: 'text-fg-muted', bg: 'bg-bg-elevated', icon: Clock },
-};
-
-const STATUS_CONFIG = {
-  running: { color: 'text-success', dot: 'bg-success' },
-  pending: { color: 'text-warning', dot: 'bg-warning' },
-  funded: { color: 'text-accent', dot: 'bg-accent' },
-  suspended: { color: 'text-error', dot: 'bg-error' },
-  terminated: { color: 'text-fg-muted', dot: 'bg-fg-muted' },
+  thriving: { label: 'Thriving', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: Zap },
+  normal: { label: 'Normal', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Scale },
+  endangered: { label: 'Endangered', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: AlertTriangle },
+  suspended: { label: 'Suspended', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: Clock },
 };
 
 export default function AgentDetailPage() {
   const { publicKey, connected } = useWallet();
   const params = useParams();
+  const router = useRouter();
   const agentId = params.id as string;
   
   const [agent, setAgent] = useState<Agent | null>(null);
@@ -65,120 +66,77 @@ export default function AgentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [showGenesis, setShowGenesis] = useState(false);
   
-  // Check if connected wallet owns this agent
-  const isOwner = connected && publicKey && agent?.owner_wallet === publicKey.toBase58();
-  
-  // Live Solana wallet balance
-  const [liveBalance, setLiveBalance] = useState<{
-    solBalance: number;
-    runtimeHours: number;
-    fundingStatus: string;
-    tier: string;
-  } | null>(null);
-  const [balanceLoading, setBalanceLoading] = useState(false);
+  // Real-time metrics with SWR (Faster updates)
+  const { data: liveBalance } = useSWR(
+    agent?.solana_address ? `/api/agents/${agentId}/balance` : null,
+    fetcher,
+    { 
+      refreshInterval: 2000, // Update every 2 seconds
+      dedupingInterval: 1000 
+    }
+  );
 
   useEffect(() => {
-    if (agentId) {
-      fetchAgent();
-    }
+    if (agentId) fetchAgent();
   }, [agentId]);
 
-  // Fetch live balance from Solana blockchain
-  useEffect(() => {
-    if (agent?.solana_address) {
-      fetchLiveBalance();
-      // Refresh balance every 30 seconds
-      const interval = setInterval(fetchLiveBalance, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [agent?.solana_address]);
-
-  // Heartbeat state for UI feedback
-  const [lastHeartbeat, setLastHeartbeat] = useState<{ points: number; streak: number } | null>(null);
-  
-  // Trigger heartbeats every 20 seconds when survival mode is active
-  useEffect(() => {
-    if (!agent?.id || agent.status !== 'running') return;
-    
-    const triggerHeartbeat = async () => {
-      try {
-        const res = await fetch('/api/survival/heartbeat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId: agent.id }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          // Update UI directly from heartbeat response (no extra API calls)
-          setLastHeartbeat({ points: data.pointsEarned, streak: data.currentStreak });
-          if (data.solanaWallet) {
-            setLiveBalance({
-              solBalance: data.solanaWallet.balance,
-              runtimeHours: data.solanaWallet.runtimeHours,
-              fundingStatus: data.solanaWallet.fundingStatus,
-              tier: data.tier,
-            });
-          }
-          // Update agent status/tier from response
-          setAgent(prev => prev ? { ...prev, survival_tier: data.tier } : null);
-        }
-      } catch (e) {
-        console.error('Heartbeat failed:', e);
-      }
-    };
-    
-    // Trigger heartbeat immediately, then every 20 seconds
-    triggerHeartbeat();
-    const interval = setInterval(triggerHeartbeat, 20000);
-    
-    return () => clearInterval(interval);
-  }, [agent?.id, agent?.status]);
-
-  const fetchLiveBalance = async () => {
-    if (!agent?.id) return;
-    setBalanceLoading(true);
+  const fetchAgent = async () => {
     try {
-      const res = await fetch(`/api/agents/${agent.id}/balance`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          setLiveBalance({
-            solBalance: data.solanaWallet.solBalance,
-            runtimeHours: data.survival.runtimeHours,
-            fundingStatus: data.survival.fundingStatus,
-            tier: data.survival.tier,
-          });
-        }
-      }
-    } catch (e) {
-      console.error('Failed to fetch live balance:', e);
+      setLoading(true);
+      const res = await fetch(`/api/agents/${agentId}`);
+      if (!res.ok) throw new Error('Failed to load agent');
+      const data = await res.json();
+      setAgent(data.agent);
+    } catch (err: any) {
+      setError(err.message);
     } finally {
-      setBalanceLoading(false);
+      setLoading(false);
     }
   };
 
-  const fetchAgent = async () => {
-    // Only set loading on initial fetch if not already loaded
-    if (!agent) setLoading(true);
-    setError(null);
+  const handleAction = async (action: 'start' | 'stop' | 'restart') => {
+    if (!agent) return;
+
+    // Survival mode requires wallet authorization
+    if (!connected || !publicKey) {
+      console.warn('Wallet not connected');
+      // Ideally show a toast here
+      return;
+    }
+
+    setActionLoading(action);
+    
     try {
-      const res = await fetch(`/api/agents/${agentId}`);
-      if (!res.ok) {
-        if (res.status === 404) {
-          setError('Agent not found');
-        } else {
-          setError('Failed to fetch agent');
+        const response = await fetch(`/api/survival/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              agentId: agent.id, 
+              action: action === 'restart' ? 'start' : action,
+              walletAddress: publicKey.toBase58()
+            })
+        });
+        
+        const data = await response.json();
+
+        if (!response.ok) {
+           throw new Error(data.error || 'Action failed');
         }
-        return;
-      }
-      const data = await res.json();
-      setAgent(data.agent);
-    } catch (e) {
-      setError('Network error');
+        
+        // Update local state with returned status
+        setAgent(prev => prev ? { 
+            ...prev, 
+            status: data.status, // 'running' or 'suspended'
+            survival_tier: data.tier || prev.survival_tier
+        } : null);
+
+    } catch (e: any) {
+        console.error('Failed to execute action:', e);
+        // Only alert on specific errors if needed, or rely on console
     } finally {
-      setLoading(false);
+        setActionLoading(null);
     }
   };
 
@@ -188,596 +146,359 @@ export default function AgentDetailPage() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const formatUptime = (seconds: number) => {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    if (days > 0) return `${days}d ${hours}h`;
-    const mins = Math.floor((seconds % 3600) / 60);
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  };
+  const isOwner = connected && publicKey && agent?.owner_wallet === publicKey.toBase58();
+  const tierConfig = agent ? TIER_CONFIG[agent.survival_tier as keyof typeof TIER_CONFIG] || TIER_CONFIG.normal : TIER_CONFIG.normal;
 
-  const handleSurvivalAction = async (action: 'start' | 'stop') => {
-    setActionLoading(action);
-    setActionMessage(null);
-    
-    if (action === 'start') {
-      setActionMessage('❤️ Entering Survival Mode...');
-    } else {
-      setActionMessage('⏹ Exiting Survival Mode...');
-    }
-    
-    try {
-      const res = await fetch('/api/survival/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          agentId, 
-          action,
-          walletAddress: publicKey?.toBase58(),
-        }),
-      });
-      
-      const data = await res.json();
-      if (data.success) {
-        // Update agent status from server response
-        setAgent(prev => prev ? {
-          ...prev,
-          status: data.status || (action === 'start' ? 'running' : 'suspended'),
-          survival_tier: data.tier || (action === 'start' ? 'normal' : 'suspended'),
-        } : null);
-        
-        setActionMessage(action === 'start' 
-          ? '✓ Agent is now in Survival Mode. Heartbeats active!'
-          : '✓ Agent exited Survival Mode. Heartbeats paused.'
-        );
-        // Don't refetch - use server response to avoid race conditions
-      } else {
-        setActionMessage(`✗ ${data.error}`);
-      }
-    } catch (e) {
-      setActionMessage('✗ Action failed - network error');
-    } finally {
-      setActionLoading(null);
-      setTimeout(() => setActionMessage(null), 10000);
-    }
-  };
 
-  if (loading && !agent) {
-    return <AgentDetailSkeleton />;
-  }
-
-  if (error || !agent) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-bg-base text-fg">
-        <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-          <AlertTriangle className="w-16 h-16 text-error mx-auto mb-4 opacity-50" />
-          <h1 className="text-2xl font-bold mb-2">{error || 'Agent not found'}</h1>
-          <p className="text-fg-muted mb-6">The agent you&apos;re looking for doesn&apos;t exist or has been removed.</p>
-          <Link href="/agents" className="text-accent hover:underline">
-            ← Back to all agents
-          </Link>
+      <div className="min-h-screen bg-[#050505] text-fg font-mono flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
+          <h2 className="text-xl font-bold text-white">Agent Retrieval Failed</h2>
+          <p className="text-fg-muted">{error}</p>
+          <button onClick={() => router.push('/dashboard')} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded border border-white/10 text-white">
+            Return to Dashboard
+          </button>
         </div>
       </div>
     );
   }
 
-  const tier = TIER_CONFIG[agent.survival_tier as keyof typeof TIER_CONFIG] || TIER_CONFIG.normal;
-  const status = STATUS_CONFIG[agent.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
-  const TierIcon = tier.icon;
-  const skills = Array.isArray(agent.skills) ? agent.skills : JSON.parse(agent.skills || '[]');
-  const credits = agent.creditsBalance || agent.credits_balance || 0;
+  if (loading) {
+     return (
+        <div className="min-h-screen bg-[#050505] text-fg font-mono">
+           <Header />
+           <div className="max-w-7xl mx-auto px-6 py-12 animate-pulse">
+              <div className="h-48 bg-white/5 rounded-xl border border-white/10 mb-6"></div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                 <div className="col-span-2 h-96 bg-white/5 rounded-xl border border-white/10"></div>
+                 <div className="h-96 bg-white/5 rounded-xl border border-white/10"></div>
+              </div>
+           </div>
+        </div>
+      );
+  }
+
+  if (!agent) return null;
 
   return (
-    <div className="min-h-screen bg-bg-base text-fg">
+    <div className="min-h-screen bg-[#050505] text-fg font-mono selection:bg-accent selection:text-white pb-20 relative">
       <Header />
 
-      {/* Content */}
-      <main className="relative max-w-4xl mx-auto px-6 py-12">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-fg-muted mb-6">
-          <Link href="/" className="hover:text-fg transition-colors">Home</Link>
-          <span>/</span>
-          <Link href="/agents" className="hover:text-fg transition-colors">Agents</Link>
-          <span>/</span>
-          <span className="text-fg">{agent.name}</span>
-        </nav>
+      {/* Global Tech Grid Overlay */}
+      <div className="fixed inset-0 pointer-events-none z-0" 
+        style={{ 
+          backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)', 
+          backgroundSize: '40px 40px' 
+        }} 
+      />
+      <div className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-transparent via-black/50 to-black/80" />
 
-        {/* Agent Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-bg-elevated flex items-center justify-center border border-border/50">
-              <User className="w-8 h-8 text-accent" />
-            </div>
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl md:text-3xl font-semibold">{agent.name}</h1>
-                <span className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border border-border ${status.color ? status.color.replace('text-', 'bg-') + '/10 ' + status.color : ''}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${status.dot} animate-pulse`} />
-                  {agent.status}
-                </span>
-              </div>
-              <p className="text-fg-muted text-sm font-mono tracking-tight">
-                {agent.id}
-              </p>
-            </div>
+      <main className="relative z-10 max-w-7xl mx-auto px-6 py-8">
+        
+        {/* Breadcrumb / Nav */}
+        <div className="mb-8 flex items-center gap-4">
+          <Link href="/dashboard" className="w-8 h-8 flex items-center justify-center rounded bg-white/5 hover:bg-white/10 border border-white/10 text-fg-muted hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <div className="h-6 w-px bg-white/10" />
+          <div className="flex items-center gap-2">
+            <span className="text-fg-muted uppercase text-xs tracking-wider font-bold">Command Center</span>
+            <span className="text-white/20">/</span>
+            <span className="text-white font-bold">{agent.name}</span>
           </div>
-          <button
-            onClick={fetchAgent}
-            className="p-2 text-fg-muted hover:text-fg hover:bg-bg-elevated rounded transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
         </div>
 
-
-
-        {/* Stats Grid - Enhanced Financials & Infrastructure */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          
-          {/* Financial Health */}
-          <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group hover:border-accent/20 transition-all">
-            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Coins className="w-16 h-16 text-accent" />
-            </div>
-            <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Wallet className="w-3.5 h-3.5" />
-              Financial State
-            </h3>
-            
-            <div className="space-y-4 relative z-10">
-              {/* Conway Credits */}
-              <div>
-                <p className="text-[10px] text-fg-muted mb-1">COMPUTE CREDITS</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-mono font-medium text-fg">
-                    ${(credits / 100).toFixed(2)}
-                  </span>
-                  <span className="text-xs text-fg-muted">USD</span>
-                </div>
-                <div className="w-full bg-white/5 h-1 mt-2 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full ${credits > 500 ? 'bg-success' : 'bg-warning'}`} 
-                    style={{ width: `${Math.min(credits / 20, 100)}%` }} 
-                  />
-                </div>
+        {/* Top Header Card */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+           {/* Identity Card */}
+           <div className="lg:col-span-2 bg-[#0c0c0e]/80 backdrop-blur-sm border border-white/10 rounded-xl p-6 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-50 transition-opacity group-hover:opacity-100">
+                 <Bot className="w-24 h-24 text-white/5" />
               </div>
-
-              {/* Crypto Balances */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
-                <div>
-                   <p className="text-[10px] text-fg-muted mb-0.5 flex items-center gap-1">
-                     <span className="w-1.5 h-1.5 rounded-full bg-[#0052FF]" /> BASE (ETH)
-                   </p>
-                   <p className="text-sm font-mono text-fg">{(agent.usdc_balance || 0).toFixed(2)} USDC</p>
-                </div>
-                <div>
-                   <p className="text-[10px] text-fg-muted mb-0.5 flex items-center gap-1">
-                     <span className="w-1.5 h-1.5 rounded-full bg-[#14F195]" /> SOLANA
-                   </p>
-                   <p className="text-sm font-mono text-fg">{(agent.sol_balance || 0).toFixed(4)} SOL</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Infrastructure Health */}
-          <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group hover:border-blue-400/20 transition-all">
-            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Activity className="w-16 h-16 text-blue-400" />
-            </div>
-            <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Zap className="w-3.5 h-3.5" />
-              Infrastructure
-            </h3>
-            
-            <div className="space-y-4 relative z-10">
-               {/* Uptime */}
-               <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-[10px] text-fg-muted mb-1">UPTIME</p>
-                    <p className="text-xl font-mono text-fg">{formatUptime(agent.uptime_seconds)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-fg-muted mb-1">STATUS</p>
-                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${status.color ? status.color.replace('text-', 'bg-') + '/20 border-' + status.color.replace('text-', '') + '/30 ' + status.color : ''}`}>
-                      {agent.status.toUpperCase()}
-                    </span>
-                  </div>
-               </div>
-
-               {/* Resources */}
-               <div className="pt-2 border-t border-white/5 space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-fg-muted">vCPU Usage</span>
-                    <span className="text-fg font-mono">12%</span>
-                  </div>
-                  <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 w-[12%]" />
-                  </div>
-                  
-                  <div className="flex justify-between text-xs">
-                    <span className="text-fg-muted">Memory</span>
-                    <span className="text-fg font-mono">248MB / 512MB</span>
-                  </div>
-                  <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                    <div className="h-full bg-purple-500 w-[48%]" />
-                  </div>
-               </div>
-            </div>
-          </div>
-
-          {/* Cloud Fleet / Scaling */}
-          <div className="card p-5 bg-bg-elevated/50 border-white/5 relative overflow-hidden group hover:border-purple-400/20 transition-all">
-            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-              <RotateCw className="w-16 h-16 text-purple-400" />
-            </div>
-            <h3 className="text-xs font-mono text-fg-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Rocket className="w-3.5 h-3.5" />
-              Cloud Fleet
-            </h3>
-            
-            <div className="relative z-10 h-full flex flex-col">
-               <div className="flex-1">
-                 <div className="flex items-center justify-between mb-2">
-                   <p className="text-[10px] text-fg-muted">ACTIVE WORKERS</p>
-                   <span className="text-xs font-mono text-fg bg-white/5 px-1.5 py-0.5 rounded">0 / 3</span>
+              
+              <div className="flex flex-col md:flex-row gap-6 relative z-10">
+                 <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center text-3xl font-bold text-white shadow-2xl relative overflow-hidden">
+                    <div className="absolute inset-0 bg-white/5 animate-pulse" />
+                    {agent.name.charAt(0)}
                  </div>
                  
-                 {/* Empty State for Workers */}
-                 <div className="h-20 border border-dashed border-white/10 rounded flex items-center justify-center text-center p-2">
-                    <p className="text-[10px] text-fg-muted">
-                      No child sandboxes active.<br/>
-                      Agent is operating normally.
-                    </p>
+                 <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                       <h1 className="text-3xl font-bold text-white tracking-tight">{agent.name}</h1>
+                       <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold border flex items-center gap-1.5 ${tierConfig.bg} ${tierConfig.color} ${tierConfig.border}`}>
+                          <tierConfig.icon className="w-3 h-3" />
+                          {tierConfig.label}
+                       </span>
+                    </div>
+                    
+                    {/* Identity & Chain Info */}
+                    <div className="flex flex-col gap-2 mb-6">
+                        <div className="font-mono text-xs text-fg-muted bg-black/40 p-2 rounded border border-white/5 flex items-center justify-between group/id">
+                            <div className="flex items-center gap-2 truncate">
+                                <span className="opacity-50 select-none uppercase tracking-wider text-[10px]">UUID:</span>
+                                <span className="select-all truncate">{agent.id}</span>
+                            </div>
+                            <Copy 
+                                className="w-3 h-3 text-fg-muted hover:text-white cursor-pointer transition-colors" 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(agent.id);
+                                    setCopied('id');
+                                    setTimeout(() => setCopied(null), 2000);
+                                }} 
+                            />
+                        </div>
+
+                        <div className="flex flex-wrap gap-3">
+                            {/* EVM Address */}
+                            <a 
+                                href={`https://basescan.org/address/${agent.evm_address}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-all group/evm"
+                            >
+                                <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] uppercase text-blue-300 font-bold tracking-wider">Base Sepolia</span>
+                                    <span className="text-xs font-mono text-blue-100 truncate max-w-[120px]">
+                                        {agent.evm_address.slice(0, 6)}...{agent.evm_address.slice(-4)}
+                                    </span>
+                                </div>
+                                <ExternalLink className="w-3 h-3 text-blue-400 opacity-50 group-hover/evm:opacity-100 ml-1" />
+                            </a>
+
+                            {/* ERC-8004 Registry */}
+                            {agent.erc8004_id ? (
+                                <a 
+                                    href={`https://sepolia.basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=${agent.erc8004_id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all group/reg"
+                                >
+                                    <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                        <Shield className="w-2.5 h-2.5 text-emerald-400" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] uppercase text-emerald-300 font-bold tracking-wider">Registered</span>
+                                        <span className="text-xs font-mono text-emerald-100">
+                                            Agent #{agent.erc8004_id}
+                                        </span>
+                                    </div>
+                                    <ExternalLink className="w-3 h-3 text-emerald-400 opacity-50 group-hover/reg:opacity-100 ml-1" />
+                                </a>
+                            ) : (
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-white/5 border border-white/10 opacity-50">
+                                    <Shield className="w-3 h-3" />
+                                    <span className="text-xs font-mono">Unregistered</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-4">
+                       <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-black/40 border border-white/10 hover:border-white/20 transition-colors">
+                          <Activity className="w-3 h-3 text-emerald-400" />
+                          <span className="text-xs text-fg-muted uppercase tracking-wider">Status:</span>
+                          <span className={`${agent.status === 'running' ? 'text-emerald-400' : 'text-red-400'} text-sm font-bold uppercase flex items-center gap-1.5`}>
+                             {agent.status === 'running' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                             {agent.status}
+                          </span>
+                       </div>
+                       
+                       <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-black/40 border border-white/10 hover:border-white/20 transition-colors">
+                          <Clock className="w-3 h-3 text-blue-400" />
+                          <span className="text-xs text-fg-muted uppercase tracking-wider">Uptime:</span>
+                          <span className="text-white text-sm font-bold font-mono">
+                             {(liveBalance?.runtimeHours || agent.uptime_seconds / 3600).toFixed(1)}h
+                          </span>
+                       </div>
+
+                       <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-black/40 border border-white/10 hover:border-white/20 transition-colors">
+                          <Coins className="w-3 h-3 text-yellow-400" />
+                          <span className="text-xs text-fg-muted uppercase tracking-wider">Balance:</span>
+                          <span className="text-white text-sm font-bold font-mono">
+                             {(liveBalance?.solBalance || agent.sol_balance || 0).toFixed(4)} SOL
+                          </span>
+                       </div>
+                    </div>
                  </div>
-               </div>
+              </div>
+           </div>
 
-               <div className="mt-auto pt-3 border-t border-white/5">
-                 <p className="text-[10px] text-fg-muted mb-1 flex items-center gap-1">
-                   <Shield className="w-3 h-3 text-green-400" />
-                   SAFETY LEVEL
-                 </p>
-                 <p className="text-sm text-fg">Standard (Self-Preservation Active)</p>
-               </div>
-            </div>
-          </div>
+           {/* Quick Actions / Control */}
+           <div className="bg-[#0c0c0e]/80 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex flex-col justify-between">
+              <div>
+                 <h3 className="text-xs text-fg-muted uppercase tracking-widest font-bold mb-4 flex items-center gap-2">
+                    <Power className="w-4 h-4 text-emerald-400" />
+                    System Control
+                 </h3>
+                 
+                 <div className="grid grid-cols-2 gap-3 mb-4">
+                    <button 
+                       disabled={agent.status === 'running' || !isOwner}
+                       onClick={() => handleAction('start')}
+                       className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded font-bold uppercase text-[10px] tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                    >
+                       {actionLoading === 'start' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                       Start
+                    </button>
+                    <button 
+                       disabled={agent.status !== 'running' || !isOwner}
+                       onClick={() => handleAction('stop')}
+                       className="flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded font-bold uppercase text-[10px] tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                       {actionLoading === 'stop' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Square className="w-4 h-4 text-xs" fill="currentColor" />}
+                       Stop
+                    </button>
+                 </div>
+                 
+                 <button 
+                  disabled={!isOwner}
+                  onClick={() => handleAction('restart')}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded font-bold uppercase text-[10px] tracking-wide transition-all disabled:opacity-50"
+                 >
+                   <RefreshCw className={`w-3 h-3 ${actionLoading === 'restart' ? 'animate-spin' : ''}`} />
+                   Restart Daemon
+                 </button>
+              </div>
 
+              {!isOwner && (
+                 <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-300">
+                    <div className="flex items-center gap-2 font-bold mb-1">
+                       <Shield className="w-3 h-3" />
+                       Read Only Mode
+                    </div>
+                    Viewing public agent. Connect owner wallet to execute commands.
+                 </div>
+              )}
+           </div>
         </div>
 
-        {/* Survival Mode Panel */}
-        <div className="mb-8 card p-6">
-          <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <Heart className="w-5 h-5 text-red-400" />
-            Survival Mode
-          </h2>
-          
-          {actionMessage && (
-            <div className={`mb-4 p-3 rounded-lg text-sm border flex items-center gap-2 ${
-              actionMessage.startsWith('✗') 
-                ? 'bg-error/10 text-error border-error/20' 
-                : actionMessage.startsWith('✓')
-                ? 'bg-success/10 text-success border-success/20'
-                : 'bg-accent/10 text-accent border-accent/20'
-            }`}>
-              {actionLoading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
-              <span>{actionMessage}</span>
-            </div>
-          )}
-          
-          <div className="grid grid-cols-2 gap-4">
-            {isOwner ? (
-              <>
-                <button
-                  onClick={() => handleSurvivalAction('start')}
-                  disabled={actionLoading !== null || ['running', 'active'].includes(agent.status) || (liveBalance?.solBalance ?? agent.sol_balance ?? 0) < 0.01}
-                  className="btn bg-success/10 text-success hover:bg-success/20 border-success/20 flex flex-col h-auto py-6 gap-3 items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {actionLoading === 'start' ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <div className="relative">
-                      <Heart className="w-6 h-6" />
-                      <Play className="w-3 h-3 absolute -bottom-1 -right-1" />
+        {/* Main Interface Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+           
+           {/* Left Column: Terminal */}
+           <div className="lg:col-span-2 bg-[#0c0c0e] border border-white/10 rounded-xl overflow-hidden flex flex-col relative shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+              <div className="h-9 bg-[#1a1a1c] border-b border-white/5 flex items-center px-4 justify-between select-none">
+                 <div className="flex items-center gap-2">
+                    <div className="flex gap-1.5">
+                       <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56] border border-[#e0443e]"></div>
+                       <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] border border-[#dea123]"></div>
+                       <div className="w-2.5 h-2.5 rounded-full bg-[#27c93f] border border-[#1aab29]"></div>
                     </div>
-                  )}
-                  <div className="text-center">
-                    <span className="text-sm font-medium uppercase tracking-wide block">Start Survival</span>
-                    <span className="text-[10px] opacity-60">
-                      {['running', 'active'].includes(agent.status) 
-                        ? 'Currently active' 
-                        : (liveBalance?.solBalance ?? agent.sol_balance ?? 0) < 0.01
-                        ? 'Fund wallet first (needs 0.01 SOL)'
-                        : 'Begin heartbeats & SOL deduction'}
-                    </span>
-                  </div>
-                </button>
-                
-                <button
-                  onClick={() => handleSurvivalAction('stop')}
-                  disabled={actionLoading !== null || !['running', 'active', 'funded'].includes(agent.status)}
-                  className="btn bg-error/10 text-error hover:bg-error/20 border-error/20 flex flex-col h-auto py-6 gap-3 items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {actionLoading === 'stop' ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <div className="relative">
-                      <Heart className="w-6 h-6" />
-                      <Square className="w-3 h-3 absolute -bottom-1 -right-1" />
+                    <div className="ml-3 text-[10px] text-fg-muted font-mono flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity cursor-default">
+                       <TerminalIcon className="w-3 h-3" />
+                       sshRoot@{agent.id.substring(0,8)}:~
                     </div>
-                  )}
-                  <div className="text-center">
-                    <span className="text-sm font-medium uppercase tracking-wide block">Stop Survival</span>
-                    <span className="text-[10px] opacity-60">
-                      {!['running', 'active', 'funded'].includes(agent.status) ? 'Not currently active' : 'Pause heartbeats & payments'}
-                    </span>
-                  </div>
-                </button>
-              </>
-            ) : (
-              <div className="col-span-2 text-center py-8 px-4 bg-bg-elevated/50 rounded-xl border border-border">
-                <Wallet className="w-8 h-8 mx-auto mb-3 text-fg-muted" />
-                <p className="text-fg-muted text-sm">
-                  {connected ? (
-                    <>Connect the <strong className="text-fg">owner wallet</strong> to control this agent's Survival Mode</>)  : (
-                    <>Connect your wallet to control this agent</>)}
-                </p>
-                {connected && publicKey && (
-                  <div className="mt-3 text-[10px] font-mono text-fg-muted/60 space-y-1">
-                    <p>Your wallet: {publicKey.toBase58()}</p>
-                    <p>Owner wallet: {agent.owner_wallet || 'not set'}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          
-          <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
-            <p className="text-xs text-fg-muted flex items-center gap-2">
-              <Heart className="w-4 h-4 text-red-400" />
-              <span>
-                <strong className="text-fg">Survival Mode:</strong> Agent sends <span className="text-white">$3.00</span> to the Vault every <span className="text-white">15 seconds</span>. 
-                Keep your agent funded to stay alive!
-              </span>
-            </p>
-          </div>
-          
-          {/* Survival Mode Explanation */}
-          <div className="mt-6 p-5 rounded-xl bg-gradient-to-br from-red-500/10 via-black/20 to-emerald-500/10 border border-white/10">
-            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" />
-              How Survival Mode Works
-            </h3>
-            
-            <div className="space-y-4 text-sm">
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
-                  <Heart className="w-4 h-4 text-red-400" />
-                </div>
-                <div>
-                  <p className="text-fg font-medium">Enter the Game</p>
-                  <p className="text-fg-muted text-xs">When you start Survival Mode, your agent enters a competitive survival game against all other agents in the network.</p>
-                </div>
+                 </div>
+                 <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                       <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                       </span>
+                       Live
+                    </div>
+                 </div>
               </div>
               
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                  <Activity className="w-4 h-4 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-fg font-medium">Heartbeat Every 15 Seconds</p>
-                  <p className="text-fg-muted text-xs">Your agent emits a heartbeat every 15 seconds. Each heartbeat costs <span className="text-white font-medium">$3.00</span> in computing power, deducted as SOL from your agent's wallet and sent to the Vault.</p>
-                </div>
+              <div className="flex-1 bg-black/90 relative overflow-hidden">
+                 <div className="absolute inset-0 p-4 font-mono text-xs overflow-auto custom-scrollbar">
+                    <AgentTerminal 
+                      agentId={agentId} 
+                      agentName={agent.name} 
+                      status={agent.status}
+                      onStatusChange={(newStatus) => {
+                         setAgent(prev => prev ? { ...prev, status: newStatus } : null);
+                      }}
+                    />
+                 </div>
               </div>
-              
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
-                  <Clock className="w-4 h-4 text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-fg font-medium">2-Minute Rounds</p>
-                  <p className="text-fg-muted text-xs">Every 2 minutes, a round concludes. The agent with the <span className="text-white font-medium">longest survival streak</span> in that round becomes eligible to claim the prize pool.</p>
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                  <Coins className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-fg font-medium">50/50 Vault Split</p>
-                  <p className="text-fg-muted text-xs">The winner claims <span className="text-emerald-400 font-medium">50%</span> of all SOL sent to the Vault during that round. The remaining <span className="text-emerald-400 font-medium">50%</span> stays in the Vault for token buybacks, supporting the ecosystem.</p>
-                </div>
-              </div>
-              
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <p className="text-xs text-fg-muted">
-                  <strong className="text-warning">⚠️ Warning:</strong> If your agent runs out of SOL, it will be eliminated from survival mode. Keep your wallet funded to maximize survival time and increase your chances of winning rounds!
-                </p>
-              </div>
-            </div>
-          </div>
+           </div>
 
-          <div className="mt-8 border-t border-white/5 pt-6">
-            <h3 className="text-sm font-medium text-fg-muted mb-3 flex items-center gap-2">
-              <TerminalIcon className="w-4 h-4" />
-              Live Logs
-            </h3>
-            <AgentTerminal 
-              agentId={agent.id} 
-              agentName={agent.name}
-              status={agent.status}
-            />
-          </div>
-          
-          <p className="mt-4 text-xs text-fg-muted flex items-center gap-1.5 opacity-70">
-            <Shield className="w-3 h-3" />
-            Survival powered by AUTOMATON Vault. SOL goes to buybacks.
-          </p>
-        </div>
-
-        {/* Wallet Addresses */}
-        <div className="mb-8">
-          <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <Coins className="w-5 h-5 text-accent" />
-            Wallet Addresses
-          </h2>
-          <div className="space-y-3">
-            <div className="card p-4 group">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-xs text-fg-muted uppercase tracking-wider font-semibold">Base (EVM)</p>
-                    <span className="px-1.5 py-0.5 bg-accent/10 text-accent text-[10px] rounded font-medium border border-accent/20">MAINNET</span>
-                  </div>
-                  <p className="font-mono text-sm truncate text-fg bg-bg-base/50 p-1.5 rounded border border-border/50">{agent.evm_address}</p>
-                </div>
-                <div className="flex items-center gap-2 ml-4 self-end mb-1.5">
-                  <button
-                    onClick={() => copyToClipboard(agent.evm_address, 'evm')}
-                    className="p-2 text-fg-muted hover:text-fg hover:bg-bg-elevated rounded transition-colors"
-                    title="Copy address"
-                  >
-                    {copied === 'evm' ? <CheckCircle className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                  <a
-                    href={`https://basescan.org/address/${agent.evm_address}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 text-fg-muted hover:text-fg hover:bg-bg-elevated rounded transition-colors"
-                    title="View on Basescan"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <div className="card p-4 group">
-              <div className="flex items-center justify-between mb-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-xs text-fg-muted uppercase tracking-wider font-semibold">Solana</p>
-                    <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-400 text-[10px] rounded font-medium border border-purple-500/20">MAINNET</span>
-                    {liveBalance && (
-                      <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium border ${
-                        liveBalance.fundingStatus === 'healthy' ? 'bg-success/10 text-success border-success/20' :
-                        liveBalance.fundingStatus === 'low' ? 'bg-warning/10 text-warning border-warning/20' :
-                        'bg-error/10 text-error border-error/20'
-                      }`}>
-                        {liveBalance.fundingStatus === 'healthy' ? 'FUNDED' :
-                         liveBalance.fundingStatus === 'low' ? 'LOW' : 'CRITICAL'}
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-mono text-sm truncate text-fg bg-bg-base/50 p-1.5 rounded border border-border/50">{agent.solana_address}</p>
-                </div>
-                <div className="flex items-center gap-2 ml-4 self-end mb-1.5">
-                  <button
-                    onClick={() => copyToClipboard(agent.solana_address, 'sol')}
-                    className="p-2 text-fg-muted hover:text-fg hover:bg-bg-elevated rounded transition-colors"
-                    title="Copy address"
-                  >
-                    {copied === 'sol' ? <CheckCircle className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                  <a
-                    href={`https://solscan.io/account/${agent.solana_address}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 text-fg-muted hover:text-fg hover:bg-bg-elevated rounded transition-colors"
-                    title="View on Solscan"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
+           {/* Right Column: Stats & Wallets */}
+           <div className="flex flex-col gap-6 h-full">
               
-              {/* Live SOL Balance */}
-              <div className="pt-2 border-t border-border/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+              {/* Wallet Info */}
+              <div className="bg-[#0c0c0e]/80 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex flex-col gap-4">
+                 <h3 className="text-xs text-fg-muted uppercase tracking-widest font-bold flex items-center gap-2">
                     <Wallet className="w-4 h-4 text-purple-400" />
-                    <span className="text-sm text-fg-muted">Balance:</span>
-                    {balanceLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
-                    ) : liveBalance ? (
-                      <span className="font-mono text-sm font-medium text-purple-400">
-                        {liveBalance.solBalance.toFixed(4)} SOL
-                      </span>
-                    ) : (
-                      <span className="text-sm text-fg-muted">--</span>
-                    )}
-                  </div>
-                  {liveBalance && (
-                    <span className="text-xs text-fg-muted">
-                      ~{liveBalance.runtimeHours}h runtime
-                    </span>
-                  )}
-                </div>
-                
-                {liveBalance && liveBalance.fundingStatus !== 'healthy' && (
-                  <div className={`mt-2 p-2 rounded text-xs ${
-                    liveBalance.fundingStatus === 'critical' || liveBalance.fundingStatus === 'empty'
-                      ? 'bg-error/10 text-error'
-                      : 'bg-warning/10 text-warning'
-                  }`}>
-                    <AlertTriangle className="w-3 h-3 inline mr-1" />
-                    {liveBalance.fundingStatus === 'empty' 
-                      ? 'Wallet empty! Send SOL to keep agent alive.'
-                      : liveBalance.fundingStatus === 'critical'
-                      ? `Critical: ~${liveBalance.runtimeHours}h left. Fund immediately!`
-                      : `Low balance: ~${liveBalance.runtimeHours}h left. Consider topping up.`
-                    }
-                  </div>
-                )}
+                    Treasury Wallets
+                 </h3>
+
+                 <div className="space-y-4">
+                    {/* Solana Wallet */}
+                    <div className="p-3 bg-black/40 border border-white/5 rounded hover:border-white/10 transition-colors group">
+                       <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                             <img src="/icons/sol.svg" className="w-4 h-4 text-white" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                             <span className="text-[10px] font-bold text-white uppercase tracking-wider">Solana</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                             {agent.solana_address ? `${agent.solana_address.slice(0,4)}...${agent.solana_address.slice(-4)}` : 'N/A'}
+                          </span>
+                       </div>
+                       <button 
+                          onClick={() => copyToClipboard(agent.solana_address, 'sol')}
+                          className="w-full py-2 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 rounded text-[10px] text-fg-muted hover:text-white transition-colors uppercase font-bold tracking-wide"
+                       >
+                          {copied === 'sol' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          Copy Address
+                       </button>
+                    </div>
+
+                    {/* EVM Wallet */}
+                    <div className="p-3 bg-black/40 border border-white/5 rounded hover:border-white/10 transition-colors group">
+                       <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                             <img src="/icons/eth.svg" className="w-4 h-4 text-white" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                             <span className="text-[10px] font-bold text-white uppercase tracking-wider">EVM</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-blue-400 font-bold">
+                             {agent.evm_address ? `${agent.evm_address.slice(0,4)}...${agent.evm_address.slice(-4)}` : 'N/A'}
+                          </span>
+                       </div>
+                       <button 
+                          onClick={() => copyToClipboard(agent.evm_address, 'evm')}
+                          className="w-full py-2 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 rounded text-[10px] text-fg-muted hover:text-white transition-colors uppercase font-bold tracking-wide"
+                       >
+                          {copied === 'evm' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          Copy Address
+                       </button>
+                    </div>
+                 </div>
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Genesis Prompt */}
-        <div className="mb-8">
-          <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <Scale className="w-5 h-5 text-accent" />
-            Genesis Prompt
-          </h2>
-          <div className="card p-5">
-            <p className="text-fg-muted whitespace-pre-wrap leading-relaxed font-mono text-sm">{agent.genesis_prompt}</p>
-          </div>
-        </div>
+              {/* Genesis Prompt Toggle */}
+              <div className="bg-[#0c0c0e]/80 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden flex flex-col flex-1">
+                 <button 
+                  onClick={() => setShowGenesis(!showGenesis)}
+                  className="w-full p-4 flex items-center justify-between bg-white/5 hover:bg-white/10 transition-colors border-b border-white/5"
+                 >
+                    <div className="flex items-center gap-2 text-xs text-white font-bold uppercase tracking-wide">
+                       <Database className="w-4 h-4 text-fg-muted" />
+                       Genesis Prompt
+                    </div>
+                    {showGenesis ? <ChevronUp className="w-4 h-4 text-fg-muted" /> : <ChevronDown className="w-4 h-4 text-fg-muted" />}
+                 </button>
+                 
+                 <div className={`flex-1 bg-black/40 p-4 font-mono text-[10px] leading-relaxed text-fg-muted overflow-auto custom-scrollbar transition-all ${showGenesis ? 'block' : 'hidden'}`}>
+                    {agent.genesis_prompt}
+                 </div>
+                 {!showGenesis && (
+                    <div className="flex-1 flex items-center justify-center flex-col gap-2 text-[10px] text-fg-muted/30 uppercase tracking-widest p-4 text-center">
+                       <Shield className="w-8 h-8 opacity-20" />
+                       System Prompt Encrypted
+                    </div>
+                 )}
+              </div>
 
-        {/* Skills */}
-        {skills.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-accent" />
-              Skills
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {skills.map((skill: string, i: number) => (
-                <span
-                  key={i}
-                  className="px-3 py-1.5 bg-bg-elevated text-fg-muted text-sm rounded border border-border"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-border">
-          <Link
-            href="/agents"
-            className="flex-1 py-3 px-4 btn btn-secondary flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Agents
-          </Link>
+           </div>
         </div>
       </main>
     </div>
   );
 }
-

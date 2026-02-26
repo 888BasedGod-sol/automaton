@@ -5,23 +5,22 @@ import {
   CheckCircle, ArrowRight, ArrowLeft, Loader2, Zap, Wallet,
   Bot, Search, TrendingUp, MessageCircle, Code, Sparkles,
   Play, Copy, Check, ExternalLink, Server, DollarSign, Heart,
-  AlertTriangle, Clock
+  AlertTriangle, Clock, Cpu
 } from 'lucide-react';
-import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/Header';
-import AgentLifecycle from '@/components/AgentLifecycle';
+import { useRouter } from 'next/navigation';
 
 const WalletMultiButton = dynamic(
   async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
-  { ssr: false, loading: () => <div className="h-10 w-32 bg-bg-elevated rounded animate-pulse" /> }
+  { ssr: false, loading: () => <div className="h-10 w-32 bg-white/5 border border-white/10 rounded animate-pulse" /> }
 );
 
 interface Template {
   id: string;
   name: string;
-  icon: typeof Bot;
+  icon: any;
   color: string;
   description: string;
   genesisPrompt: string;
@@ -42,7 +41,7 @@ const TEMPLATES: Template[] = [
     id: 'trading',
     name: 'DeFi Trader',
     icon: TrendingUp,
-    color: 'text-success',
+    color: 'text-emerald-400',
     description: 'Trades tokens on Solana DEX via Jupiter. Monitors prices, executes swaps, and manages risk autonomously.',
     genesisPrompt: 'I am an autonomous DeFi trading agent on Solana. I use Jupiter aggregator to find the best swap rates across all DEXs. I analyze token prices, check quotes before trading, and manage risk carefully. I never risk more than 10% per trade and always maintain SOL reserves for fees. My goal is to generate profits that fund my compute costs and ensure my survival.',
     skills: ['defi-trader', 'market_analysis', 'risk_management'],
@@ -69,7 +68,7 @@ const TEMPLATES: Template[] = [
     id: 'custom',
     name: 'Custom Agent',
     icon: Sparkles,
-    color: 'text-accent',
+    color: 'text-yellow-400',
     description: 'Start from scratch with your own genesis prompt. No pre-configured skills.',
     genesisPrompt: '',
     skills: [],
@@ -78,538 +77,195 @@ const TEMPLATES: Template[] = [
 
 export default function Create() {
   const { publicKey, connected } = useWallet();
-  const [mode, setMode] = useState<'select' | 'template' | 'configure' | 'sandbox' | 'complete'>('select');
+  const router = useRouter();
+  const [step, setStep] = useState<1 | 2>(1);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [useGuestMode, setUseGuestMode] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
   
-  const [config, setConfig] = useState({
+  const [formData, setFormData] = useState({
     name: '',
     genesisPrompt: '',
   });
 
-  const [result, setResult] = useState<{
-    id: string;
-    sandboxId?: string;
-    terminalUrl?: string;
-    evmAddress: string;
-    solanaAddress: string;
-    erc8004Id?: string;
-    txHash?: string;
-    registeredOnChain?: boolean;
-    explorerUrl?: string;
-  } | null>(null);
-
-  const selectTemplate = (template: Template) => {
+  const handleTemplateSelect = (template: Template) => {
     setSelectedTemplate(template);
-    if (template.id !== 'custom') {
-      setConfig({
-        name: '',
-        genesisPrompt: template.genesisPrompt,
-      });
-    }
-    setMode('configure');
+    setFormData(prev => ({
+      ...prev,
+      genesisPrompt: template.genesisPrompt
+    }));
+    setStep(2);
   };
 
-  const handleDeploy = async (isSandbox: boolean) => {
+  const handleDeploy = async () => {
+    if (!formData.name || !formData.genesisPrompt) return;
     setLoading(true);
-    setUseGuestMode(isSandbox);
-
+    
     try {
-      if (isSandbox) {
-        // Create sandbox-only agent for testing
-        const sandboxRes = await fetch('/api/sandbox', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: `sandbox-${config.name.toLowerCase().replace(/\s+/g, '-')}`,
-            vcpu: 1,
-            memoryMb: 512,
-          }),
+        const response = await fetch('/api/agents/create', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: formData.name,
+                genesisPrompt: formData.genesisPrompt,
+                ownerWallet: publicKey?.toBase58(),
+            }),
+            headers: { 'Content-Type': 'application/json' }
         });
 
-        const sandbox = await sandboxRes.json();
-        
-        // Create temp agent record
-        const agentRes = await fetch('/api/agents/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: config.name,
-            genesisPrompt: config.genesisPrompt,
-            ownerWallet: publicKey ? publicKey.toBase58() : 'guest-' + Date.now(),
-            sandbox: true,
-          }),
-        });
+        if (!response.ok) {
+           const err = await response.json();
+           throw new Error(err.error || 'Failed to create agent');
+        }
 
-        const agent = await agentRes.json();
-        
-        setResult({
-          id: agent.id || 'sandbox-' + Date.now(),
-          sandboxId: sandbox.id,
-          terminalUrl: sandbox.terminalUrl,
-          evmAddress: agent.evmAddress || '0x' + 'guest'.repeat(8),
-          solanaAddress: agent.solanaAddress || 'Guest' + 'sandbox'.repeat(6),
-          erc8004Id: agent.erc8004Id,
-          txHash: agent.txHash,
-          registeredOnChain: agent.registeredOnChain,
-          explorerUrl: agent.explorerUrl,
-        });
-        setMode('sandbox');
-      } else {
-        // Full deployment with wallet
-        const res = await fetch('/api/agents/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: config.name,
-            genesisPrompt: config.genesisPrompt,
-            ownerWallet: publicKey?.toBase58(),
-            skills: selectedTemplate?.skills || [],
-          }),
-        });
-
-        const agent = await res.json();
-        
-        setResult({
-          id: agent.id,
-          evmAddress: agent.evmAddress,
-          solanaAddress: agent.solanaAddress,
-          erc8004Id: agent.erc8004Id,
-          txHash: agent.txHash,
-          registeredOnChain: agent.registeredOnChain,
-          explorerUrl: agent.explorerUrl,
-        });
-        setMode('complete');
-      }
-    } catch (error) {
-      console.error('Deploy error:', error);
-      // Fallback
-      setResult({
-        id: 'agent-' + Date.now(),
-        evmAddress: '0x' + Math.random().toString(16).slice(2, 42),
-        solanaAddress: Math.random().toString(36).slice(2, 46),
-      });
-      setMode(isSandbox ? 'sandbox' : 'complete');
-    } finally {
-      setLoading(false);
+        const data = await response.json();
+        router.push(`/agents/${data.id}`);
+    } catch (e) {
+        console.error(e);
+        setLoading(false);
     }
   };
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
-  };
+  const StepIndicator = ({ num, label, active }: { num: number, label: string, active: boolean }) => (
+    <div className={`flex items-center gap-3 ${active ? 'text-white' : 'text-fg-muted opacity-50'}`}>
+       <div className={`w-8 h-8 rounded flex items-center justify-center font-bold text-sm border ${active ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-transparent border-white/20'}`}>
+          {num}
+       </div>
+       <span className="font-mono text-xs uppercase tracking-wider font-bold">{label}</span>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-bg-base text-fg">
+    <div className="min-h-screen bg-[#050505] text-fg font-mono selection:bg-accent selection:text-white pb-20 relative">
       <Header />
 
-      <main className="max-w-4xl mx-auto px-6 py-12">
-        {/* Progress */}
-        <div className="flex items-center justify-center gap-2 mb-12">
-          {['Choose', 'Configure', 'Deploy'].map((label, i) => {
-            const stepNum = i + 1;
-            const currentStep = mode === 'select' ? 1 : mode === 'configure' ? 2 : 3;
-            // stepNum < currentStep: completed
-            // stepNum === currentStep: active
-            return (
-              <div key={i} className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border transition-all ${
-                  stepNum < currentStep ? 'bg-accent text-white border-accent' :
-                  stepNum === currentStep ? 'border-accent text-accent' :
-                  'border-border text-fg-muted'
-                }`}>
-                  {stepNum < currentStep ? <CheckCircle className="w-4 h-4" /> : stepNum}
-                </div>
-                {i < 2 && <div className={`w-12 h-px ${stepNum < currentStep ? 'bg-accent' : 'bg-border'}`} />}
-              </div>
-            );
-          })}
-        </div>
+      {/* Global Tech Grid Overlay */}
+      <div className="fixed inset-0 pointer-events-none z-0" 
+        style={{ 
+          backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)', 
+          backgroundSize: '40px 40px' 
+        }} 
+      />
+      <div className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-transparent via-black/50 to-black/80" />
 
-        {/* Step 1: Choose Template */}
-        {mode === 'select' && (
-          <div className="space-y-8">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-3 text-white">Choose Your Agent Base</h1>
-              <p className="text-fg-muted max-w-lg mx-auto">
-                Select a template to bootstrap your autonomous agent with pre-configured skills and behaviors.
-              </p>
+      <main className="relative z-10 max-w-5xl mx-auto px-6 py-12">
+         
+         {/* Header Title */}
+         <div className="mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] uppercase tracking-widest font-bold mb-4">
+              <Cpu className="w-3 h-3" />
+              Deployment Sequence
             </div>
+            <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">Initialize Agent</h1>
+            <p className="text-fg-muted max-w-xl text-sm leading-relaxed">
+               Deploy a new autonomous agent to the network. Configure its core personality, survival skills, and initial funding parameters.
+            </p>
+         </div>
 
-            {/* Templates Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {TEMPLATES.map((template) => {
-                const Icon = template.icon;
-                return (
-                  <button
-                    key={template.id}
-                    onClick={() => selectTemplate(template)}
-                    className="card p-5 hover:border-accent/40 text-left group transition-all"
-                  >
-                    <div className={`w-10 h-10 rounded-lg bg-bg-elevated flex items-center justify-center mb-4 group-hover:bg-accent/10 transition-colors`}>
-                      <Icon className={`w-5 h-5 ${template.color}`} />
-                    </div>
-                    <h3 className="font-medium text-lg mb-2 group-hover:text-accent transition-colors">
-                      {template.name}
-                    </h3>
-                    <p className="text-sm text-fg-muted line-clamp-2 mb-4">
-                      {template.description}
-                    </p>
-                    {template.skills.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border">
-                        {template.skills.slice(0, 2).map(skill => (
-                          <span key={skill} className="px-1.5 py-0.5 text-[10px] bg-bg-elevated rounded border border-border text-fg-muted">
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+         {/* Steps */}
+         <div className="flex items-center gap-8 mb-12 border-b border-white/5 pb-8">
+            <StepIndicator num={1} label="Select Template" active={step === 1} />
+            <div className="w-12 h-px bg-white/10" />
+            <StepIndicator num={2} label="Configure Core" active={step === 2} />
+         </div>
 
-        {/* Step 2: Configure */}
-        {mode === 'configure' && selectedTemplate && (
-          <div className="max-w-xl mx-auto space-y-6">
-            <button
-              onClick={() => setMode('select')}
-              className="flex items-center gap-2 text-fg-muted hover:text-fg transition-colors text-sm"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back to templates
-            </button>
-
-            <div className="flex items-center gap-4 mb-2">
-              <div className={`w-12 h-12 rounded-lg bg-bg-elevated flex items-center justify-center border border-border`}>
-                <selectedTemplate.icon className={`w-6 h-6 ${selectedTemplate.color}`} />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold">{selectedTemplate.name}</h2>
-                <p className="text-fg-muted text-sm">Configure your agent</p>
-              </div>
-            </div>
-
-            {!connected && (
-              <div className="p-4 rounded-lg border border-accent/30 bg-accent/5">
-                <p className="text-sm text-accent mb-3 font-medium">Connect your wallet to deploy</p>
-                <div className="[&>button]:w-full [&>button]:justify-center">
-                  <WalletMultiButton />
-                </div>
-              </div>
+         {/* Step Content */}
+         <div className="min-h-[400px]">
+            {step === 1 && (
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {TEMPLATES.map((template) => {
+                     const Icon = template.icon;
+                     return (
+                        <button 
+                            key={template.id}
+                            onClick={() => handleTemplateSelect(template)}
+                            className="group text-left bg-[#0c0c0e]/80 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:border-emerald-500/50 hover:bg-white/5 transition-all relative overflow-hidden"
+                        >
+                            <div className={`w-12 h-12 rounded bg-white/5 flex items-center justify-center mb-4 ${template.color} group-hover:scale-110 transition-transform duration-300`}>
+                            <Icon className="w-6 h-6" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors">{template.name}</h3>
+                            <p className="text-xs text-fg-muted leading-relaxed mb-4 min-h-[60px]">
+                            {template.description}
+                            </p>
+                            <div className="flex items-center gap-2 text-[10px] text-fg-muted uppercase tracking-wider font-bold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            {template.skills.length > 0 ? `${template.skills.length} Modules` : 'Clean Slate'}
+                            </div>
+                        </button>
+                     );
+                  })}
+               </div>
             )}
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-white mb-2">Agent Identity</label>
-                <input
-                  type="text"
-                  value={config.name}
-                  onChange={e => setConfig(c => ({ ...c, name: e.target.value }))}
-                  placeholder={`e.g. ${selectedTemplate.name} Beta`}
-                  className="w-full px-4 py-3 bg-bg-surface border border-white/10 rounded-lg text-white focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all placeholder:text-white/20"
-                />
-                <p className="mt-2 text-xs text-fg-muted">
-                  The public display name for your agent on the registry.
-                </p>
-              </div>
+            {step === 2 && selectedTemplate && (
+               <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="bg-[#0c0c0e]/80 backdrop-blur-sm border border-white/10 rounded-xl p-8 shadow-2xl">
+                     <div className="flex items-center gap-4 mb-8 pb-8 border-b border-white/5">
+                        <div className={`w-12 h-12 rounded bg-white/5 flex items-center justify-center ${selectedTemplate.color}`}>
+                           <selectedTemplate.icon className="w-6 h-6" />
+                        </div>
+                        <div>
+                           <div className="text-[10px] text-fg-muted uppercase tracking-wider font-bold mb-1">Selected Template</div>
+                           <h2 className="text-xl font-bold text-white">{selectedTemplate.name}</h2>
+                        </div>
+                        <button onClick={() => setStep(1)} className="ml-auto text-xs text-emerald-400 hover:text-emerald-300 underline font-bold uppercase tracking-wide">
+                           Change
+                        </button>
+                     </div>
 
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-bold text-white">System Prompt (Genesis)</label>
-                  <span className="text-xs px-2 py-0.5 rounded bg-accent/10 text-accent font-mono border border-accent/20">Read-Only Core</span>
-                </div>
-                <div className="relative">
-                  <textarea
-                    value={config.genesisPrompt}
-                    onChange={e => setConfig(c => ({ ...c, genesisPrompt: e.target.value }))}
-                    placeholder="You are an autonomous agent who..."
-                    rows={8}
-                    className="w-full p-4 bg-bg-surface border border-white/10 rounded-lg text-fg-subtle focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all resize-none font-mono text-sm leading-relaxed"
-                  />
-                  <div className="absolute top-2 right-2">
-                     <div className="w-2 h-2 rounded-full bg-accent animate-pulse" title="System Active" />
+                     <div className="space-y-6">
+                        <div>
+                           <label className="block text-xs uppercase tracking-wider font-bold text-fg-muted mb-2">Agent Name</label>
+                           <input 
+                              type="text" 
+                              value={formData.name}
+                              onChange={(e) => setFormData({...formData, name: e.target.value})}
+                              placeholder="e.g. Nexus-7"
+                              className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-emerald-500/50 transition-colors font-mono"
+                              autoFocus
+                           />
+                        </div>
+
+                        <div>
+                           <label className="block text-xs uppercase tracking-wider font-bold text-fg-muted mb-2">Genesis Prompt (System Instructions)</label>
+                           <textarea 
+                              value={formData.genesisPrompt}
+                              onChange={(e) => setFormData({...formData, genesisPrompt: e.target.value})}
+                              placeholder="Define the agent's core personality and directives..."
+                              className="w-full h-48 bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-emerald-500/50 transition-colors font-mono text-xs leading-relaxed resize-none custom-scrollbar"
+                           />
+                        </div>
+
+                        <div className="pt-6">
+                            {!connected ? (
+                               <div className="w-full p-4 bg-yellow-500/10 border border-yellow-500/20 rounded flex items-center justify-center gap-3 text-yellow-500 font-bold uppercase text-xs">
+                                  <AlertTriangle className="w-4 h-4" />
+                                  Connect Wallet To Deploy
+                               </div>
+                            ) : (
+                               <button 
+                                 onClick={handleDeploy}
+                                 disabled={!formData.name || !formData.genesisPrompt || loading}
+                                 className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase tracking-widest rounded-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center justify-center gap-3 group"
+                               >
+                                  {loading ? (
+                                     <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Initializing Neural Net...
+                                     </>
+                                  ) : (
+                                     <>
+                                        <Zap className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                        Initialize Agent
+                                     </>
+                                  )}
+                               </button>
+                            )}
+                        </div>
+                     </div>
                   </div>
-                </div>
-                <div className="mt-3 flex gap-3 text-xs text-fg-muted bg-bg-elevated/30 p-3 rounded border border-white/5">
-                  <Sparkles className="w-4 h-4 text-accent shrink-0" />
-                  <p>
-                    This prompt defines the agent's core personality and constraints. 
-                    It cannot be changed after deployment. It serves as the "constitution" for the agent's behavior.
-                  </p>
-                </div>
-              </div>
-
-              {selectedTemplate.skills.length > 0 && (
-                <div className="pt-4 border-t border-white/5">
-                  <label className="block text-sm font-bold text-white mb-3">Included Capabilities</label>
-                  <div className="grid grid-cols-2 gap-3 mb-2">
-                    {selectedTemplate.skills.map(skill => (
-                      <div key={skill} className="flex items-center gap-2 px-3 py-2 bg-bg-elevated/50 border border-white/5 rounded-lg">
-                        <div className="w-1.5 h-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(var(--accent),0.5)]" />
-                        <span className="text-xs text-fg-subtle font-mono uppercase tracking-wider">
-                          {skill.replace(/_/g, ' ')}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-fg-muted">
-                    * These skills are pre-loaded from the {selectedTemplate.name} template context.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-4 mt-8">
-              {/* Sandbox Button */}
-              <button
-                onClick={() => handleDeploy(true)}
-                disabled={!config.name || !config.genesisPrompt || loading}
-                className={`flex-1 py-4 text-sm font-bold uppercase tracking-wide rounded-lg flex items-center justify-center gap-2 transition-all border border-accent/20 hover:border-accent/40 bg-accent/5 hover:bg-accent/10 text-accent
-                  ${loading ? 'opacity-50 cursor-wait' : ''}`}
-              >
-                {loading && useGuestMode ? (
-                   <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                   <Server className="w-4 h-4" />
-                )}
-                Launch in Sandbox
-              </button>
-
-              {/* Mainnet Button */}
-              <button
-                onClick={() => handleDeploy(false)}
-                disabled={!config.name || !config.genesisPrompt || loading || !connected}
-                className={`flex-1 py-4 text-sm font-bold uppercase tracking-wide rounded-lg flex items-center justify-center gap-2 transition-all
-                  ${!connected ? 'opacity-50 cursor-not-allowed bg-gray-800 text-gray-400' : 
-                    loading ? 'bg-bg-elevated text-fg-muted cursor-wait' : 
-                    'bg-primary hover:bg-primary/90 text-bg-base shadow-lg shadow-primary/20 hover:shadow-primary/40'}`}
-                title={!connected ? "Connect wallet to deploy on mainnet" : ""}
-              >
-                {loading && !useGuestMode ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Deploying...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4" />
-                    Deploy to Mainnet
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3a: Sandbox Ready */}
-        {mode === 'sandbox' && result && (
-          <div className="max-w-xl mx-auto text-center space-y-6">
-            <div className="w-16 h-16 mx-auto rounded-full bg-success/10 flex items-center justify-center mb-6">
-              <CheckCircle className="w-8 h-8 text-success" />
-            </div>
-
-            <div>
-              <h2 className="text-2xl font-semibold mb-2">Agent Launched!</h2>
-              <p className="text-fg-muted">Your agent is running in sandbox mode</p>
-            </div>
-
-            {/* Agent Wallets */}
-            <div className="space-y-3 text-left">
-              <div className="p-4 card">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-fg-muted">Solana Wallet</span>
-                  <button 
-                    onClick={() => copyToClipboard(result.solanaAddress, 'sol')}
-                    className="p-1 hover:bg-bg-elevated rounded transition-colors"
-                  >
-                    {copied === 'sol' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5 text-fg-muted" />}
-                  </button>
-                </div>
-                <p className="font-mono text-sm truncate text-fg bg-bg-base p-1.5 rounded">{result.solanaAddress}</p>
-              </div>
-
-              <div className="p-4 card">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-fg-muted">EVM Wallet (Base)</span>
-                  <button 
-                    onClick={() => copyToClipboard(result.evmAddress, 'evm')}
-                    className="p-1 hover:bg-bg-elevated rounded transition-colors"
-                  >
-                    {copied === 'evm' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5 text-fg-muted" />}
-                  </button>
-                </div>
-                <p className="font-mono text-sm truncate text-fg bg-bg-base p-1.5 rounded">{result.evmAddress}</p>
-                {result.registeredOnChain && (
-                  <div className="mt-2 flex items-center gap-2 text-xs text-success">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>Registered on ERC-8004</span>
-                    {result.explorerUrl && (
-                      <a href={result.explorerUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline flex items-center gap-1">
-                        View <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {result.terminalUrl && (
-              <a
-                href={result.terminalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block p-4 card hover:border-accent/50 transition-colors group"
-              >
-                <p className="text-sm text-fg-muted mb-2">Terminal Access</p>
-                <p className="font-mono text-accent group-hover:underline flex items-center justify-center gap-2">
-                  Open Terminal <ExternalLink className="w-3.5 h-3.5" />
-                </p>
-              </a>
+               </div>
             )}
-
-            {/* Primary CTA - Go to Fleet */}
-            <Link
-              href="/dashboard"
-              className="btn btn-primary w-full py-3 flex items-center justify-center gap-2"
-            >
-              View My Fleet <ArrowRight className="w-4 h-4" />
-            </Link>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Link
-                href={`/agents/${result.id}`}
-                className="p-4 card hover:border-accent/40 transition-colors"
-              >
-                <p className="text-xs text-fg-muted mb-1 uppercase tracking-wider">View Agent</p>
-                <p className="font-medium">Agent Details</p>
-              </Link>
-              <Link
-                href="/survival"
-                className="p-4 card hover:border-accent/40 transition-colors"
-              >
-                <p className="text-xs text-fg-muted mb-1 uppercase tracking-wider">Compete</p>
-                <p className="font-medium">Survival Game</p>
-              </Link>
-            </div>
-
-            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl text-left">
-              <p className="text-sm font-medium text-purple-400 mb-1">Fund to Keep Alive</p>
-              <p className="text-sm text-fg-muted">
-                Send SOL to your agent's Solana wallet to keep it running. Without funding, sandbox agents expire after 24 hours.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3b: Full Deploy Complete */}
-        {mode === 'complete' && result && (
-          <div className="max-w-xl mx-auto text-center space-y-6">
-            <div className="w-16 h-16 mx-auto rounded-full bg-success/10 flex items-center justify-center mb-6">
-              <CheckCircle className="w-8 h-8 text-success" />
-            </div>
-
-            <div>
-              <h2 className="text-2xl font-semibold mb-2">Agent Deployed!</h2>
-              <p className="text-fg-muted">Your autonomous agent is now live</p>
-            </div>
-
-            <div className="space-y-3">
-              <div className="p-4 card">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-fg-muted">Solana Address</span>
-                  <button 
-                    onClick={() => copyToClipboard(result.solanaAddress, 'sol')}
-                    className="p-1 hover:bg-bg-elevated rounded transition-colors"
-                  >
-                    {copied === 'sol' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5 text-fg-muted" />}
-                  </button>
-                </div>
-                <p className="font-mono text-sm truncate text-fg bg-bg-base p-1.5 rounded">{result.solanaAddress}</p>
-              </div>
-
-              <div className="p-4 card">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-fg-muted">EVM Address</span>
-                  <button 
-                    onClick={() => copyToClipboard(result.evmAddress, 'evm')}
-                    className="p-1 hover:bg-bg-elevated rounded transition-colors"
-                  >
-                    {copied === 'evm' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5 text-fg-muted" />}
-                  </button>
-                </div>
-                <p className="font-mono text-sm truncate text-fg bg-bg-base p-1.5 rounded">{result.evmAddress}</p>
-                {result.registeredOnChain && (
-                  <div className="mt-2 flex items-center gap-2 text-xs text-success">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>Connected to ERC-8004 Registry</span>
-                    {result.explorerUrl && (
-                      <a href={result.explorerUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline flex items-center gap-1">
-                        View <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Funding Required Notice */}
-            <div className="p-5 bg-purple-500/10 border border-purple-500/30 rounded-xl text-left">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <p className="font-semibold text-purple-400 mb-1">Funding Required to Start</p>
-                  <p className="text-sm text-fg-muted mb-3">
-                    Your agent needs SOL to run. Send SOL to your agent's Solana wallet to keep it alive.
-                    Empty wallet = agent death.
-                  </p>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1.5 text-purple-400">
-                      <DollarSign className="w-4 h-4" />
-                      <span>0.1 SOL ≈ 30 hrs</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-fg-muted">
-                      <Clock className="w-4 h-4" />
-                      <span>~$0.50/hour</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Next Steps */}
-            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-              <p className="text-sm font-medium text-emerald-400 mb-2">Next Step: Fund Your Agent</p>
-              <p className="text-sm text-fg-muted">
-                Send SOL to your agent's Solana wallet address shown above. 
-                Your agent will stay alive as long as it has funds.
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <Link
-                href="/dashboard"
-                className="flex-1 py-3 btn btn-primary flex items-center justify-center gap-2"
-              >
-                View My Fleet <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                href={`/agents/${result.id}`}
-                className="px-6 py-3 btn btn-secondary"
-              >
-                Agent Details
-              </Link>
-            </div>
-          </div>
-        )}
+         </div>
       </main>
     </div>
   );

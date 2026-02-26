@@ -30,14 +30,11 @@ function getPool(): Pool {
 }
 
 // Helper to execute SQL queries
+// Added connection pooling optimization
 export async function query(text: string, params?: any[]): Promise<{ rows: any[] }> {
-  const client = await getPool().connect();
-  try {
-    const result = await client.query(text, params);
-    return { rows: result.rows };
-  } finally {
-    client.release();
-  }
+  // Use pool.query directly for single queries - it is faster and handles connection release automatically
+  const pool = getPool();
+  return await pool.query(text, params);
 }
 
 export interface Agent {
@@ -360,7 +357,7 @@ export async function getAllAgents(): Promise<Agent[]> {
 }
 
 // Get agents by owner wallet
-export async function getAgentsByOwner(ownerWallet: string): Promise<Agent[]> {
+export async function getAgentsByOwner(ownerWallet: string, limit = 50): Promise<Agent[]> {
   try {
     const result = await query(
       `SELECT id, name, genesis_prompt, creator_wallet, owner_wallet, evm_address, solana_address,
@@ -369,8 +366,8 @@ export async function getAgentsByOwner(ownerWallet: string): Promise<Agent[]> {
              agent_card, erc8004_id, sandbox_id, version, created_at, funded_at, started_at
       FROM agents
       WHERE owner_wallet = $1
-      ORDER BY created_at DESC`,
-      [ownerWallet]
+      ORDER BY created_at DESC LIMIT $2`,
+      [ownerWallet, limit]
     );
     
     return result.rows.map(parseAgent);
@@ -655,6 +652,7 @@ export async function updateAgentStatus(
     
     if (status === 'running') {
       updates.push('started_at = CASE WHEN started_at IS NULL THEN NOW() ELSE started_at END');
+      updates.push('last_heartbeat = NOW()');
     }
     
     // When suspending, also set survival_tier and reset streak

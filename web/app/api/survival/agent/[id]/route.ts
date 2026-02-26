@@ -45,7 +45,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       stats,
       season: season ? {
@@ -55,6 +55,12 @@ export async function GET(
         endsAt: season.endAt,
       } : null,
     });
+
+    // Cache for 2s (fresh stats critical)
+    response.headers.set('Cache-Control', 'public, s-maxage=2, stale-while-revalidate=5');
+    
+    return response;
+
   } catch (error: any) {
     console.error('Agent survival stats error:', error);
     return NextResponse.json(

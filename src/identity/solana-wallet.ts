@@ -1,8 +1,8 @@
 /**
  * Solana Wallet Management
  *
- * Creates and manages a Solana keypair for the automaton's identity and payments.
- * The secret key is the automaton's sovereign identity on Solana.
+ * Creates and manages a Solana keypair for the automagotchi's identity and payments.
+ * The secret key is the automagotchi's sovereign identity on Solana.
  */
 
 import { Keypair, PublicKey } from "@solana/web3.js";
@@ -18,7 +18,7 @@ export interface SolanaWalletData {
 
 const AUTOMATON_DIR = path.join(
   process.env.HOME || "/root",
-  ".automaton",
+  ".automagotchi",
 );
 const SOLANA_WALLET_FILE = path.join(AUTOMATON_DIR, "solana-wallet.json");
 
@@ -27,8 +27,8 @@ export function getSolanaWalletPath(): string {
 }
 
 /**
- * Get or create the automaton's Solana wallet.
- * The secret key IS the automaton's identity on Solana -- protect it.
+ * Get or create the automagotchi's Solana wallet.
+ * The secret key IS the automagotchi's identity on Solana -- protect it.
  */
 export async function getSolanaWallet(): Promise<{
   keypair: Keypair;

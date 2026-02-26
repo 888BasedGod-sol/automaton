@@ -218,14 +218,11 @@ export async function POST(request: NextRequest) {
     // DEDUCT SOL FOR RUNTIME - Send to treasury for buybacks
     // Flat fee: $0.50 per heartbeat
     let heartbeatFeeResult = null;
-    let feeDeductionDebug = { hasAddress: false, hasPrivateKey: false, reason: '' };
     if (agent.solana_address) {
-      feeDeductionDebug.hasAddress = true;
       try {
         // Get agent's private key to sign transaction
         const agentWithKeys = await getAgentWithKeys(agent.id);
         if (agentWithKeys?.solana_private_key) {
-          feeDeductionDebug.hasPrivateKey = true;
           heartbeatFeeResult = await deductHeartbeatFee(
             agentWithKeys.solana_private_key
           );
@@ -250,20 +247,12 @@ export async function POST(request: NextRequest) {
             );
             
             console.log(`[heartbeat] Agent ${agent.id} charged $${HEARTBEAT_COST_CREDITS} (${heartbeatFeeResult.solDeducted.toFixed(6)} SOL)`);
-          } else {
-            feeDeductionDebug.reason = `Transaction failed: ${heartbeatFeeResult?.error || 'unknown'}`;
           }
-        } else {
-          feeDeductionDebug.reason = 'No solana_private_key stored for this agent';
-          console.log(`[heartbeat] Agent ${agent.id} has no solana_private_key, skipping fee deduction`);
         }
       } catch (feeError: any) {
-        feeDeductionDebug.reason = `Exception: ${feeError.message}`;
         console.error('[heartbeat] Fee deduction failed:', feeError.message);
         // Continue with heartbeat even if fee fails
       }
-    } else {
-      feeDeductionDebug.reason = 'No solana_address on agent';
     }
 
     // Update agent's last heartbeat and uptime
@@ -299,8 +288,6 @@ export async function POST(request: NextRequest) {
           sentToTreasury: true,
         }
       }),
-      // Debug info for fee deduction (temporary)
-      ...(!heartbeatFeeResult?.success && { feeDeductionDebug }),
       ...(conwayData && { conway: { creditsCents: conwayData.creditsCents, sandboxStatus: conwayData.status } }),
     });
   } catch (error: any) {

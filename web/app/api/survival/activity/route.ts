@@ -125,8 +125,9 @@ export async function GET(request: NextRequest) {
 
     const stats = statsResult.rows[0] || {};
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
+      lastUpdated: new Date().toISOString(),
       activities,
       stats: {
         totalAgents: parseInt(stats.total_agents) || 0,
@@ -143,6 +144,12 @@ export async function GET(request: NextRequest) {
       heartbeatCost: 3, // $3 per heartbeat
       heartbeatInterval: 15, // seconds
     });
+
+    // Cache for 5s, stale for 10s to reduce DB load
+    response.headers.set('Cache-Control', 'public, s-maxage=5, stale-while-revalidate=10');
+    
+    return response;
+
   } catch (error: any) {
     console.error('Activity feed error:', error);
     return NextResponse.json(

@@ -1,7 +1,7 @@
 {
-  "name": "@conway/automaton-dashboard",
+  "name": "@conway/automagotchi-dashboard",
   "version": "0.1.0",
-  "description": "Automaton Dashboard - Sovereign AI Agent Control Panel",
+  "description": "Automagotchi Dashboard - Sovereign AI Agent Control Panel",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,13 +16,13 @@
     "funding-monitor": "npx tsx scripts/funding-monitor.ts"
   },
   "keywords": [
-    "automaton",
+    "automagotchi",
     "ai",
     "dashboard",
     "solana",
     "ethereum"
   ],
-  "author": "Automaton <automaton@conway.tech>",
+  "author": "Automagotchi <automagotchi@conway.tech>",
   "license": "MIT",
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -40,9 +40,11 @@
     "@types/node": "^25.2.3",
     "@types/pg": "^8.16.0",
     "@types/react": "^19.2.14",
+    "@vercel/analytics": "^1.6.1",
     "@vercel/kv": "^3.0.0",
     "@vercel/postgres": "^0.10.0",
     "autoprefixer": "^10.4.24",
+    "better-sqlite3": "^12.6.2",
     "bs58": "^6.0.0",
     "ethers": "^6.16.0",
     "lucide-react": "^0.574.0",
@@ -53,6 +55,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-force-graph-2d": "^1.29.1",
+    "swr": "^2.4.0",
     "tailwindcss": "^3.4.19",
     "tweetnacl": "^1.0.3",
     "typescript": "^5.9.3",

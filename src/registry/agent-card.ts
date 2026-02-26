@@ -9,9 +9,9 @@
 import type {
   AgentCard,
   AgentService,
-  AutomatonConfig,
-  AutomatonIdentity,
-  AutomatonDatabase,
+  AutomagotchiConfig,
+  AutomagotchiIdentity,
+  AutomagotchiDatabase,
   ConwayClient,
 } from "../types.js";
 
@@ -21,12 +21,12 @@ const AGENT_CARD_TYPE =
 import { getSolanaWallet } from "../identity/solana-wallet.js";
 
 /**
- * Generate an agent card from the automaton's current state.
+ * Generate an agent card from the automagotchi's current state.
  */
 export async function generateAgentCard(
-  identity: AutomatonIdentity,
-  config: AutomatonConfig,
-  db: AutomatonDatabase,
+  identity: AutomagotchiIdentity,
+  config: AutomagotchiConfig,
+  db: AutomagotchiDatabase,
 ): Promise<AgentCard> {
   const services: AgentService[] = [
     {
@@ -142,5 +142,5 @@ export async function saveAgentCard(
 ): Promise<void> {
   const cardJson = serializeAgentCard(card);
   const home = process.env.HOME || "/root";
-  await conway.writeFile(`${home}/.automaton/agent-card.json`, cardJson);
+  await conway.writeFile(`${home}/.automagotchi/agent-card.json`, cardJson);
 }

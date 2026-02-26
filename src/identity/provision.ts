@@ -1,7 +1,7 @@
 /**
- * Automaton SIWE Provisioning
+ * Automagotchi SIWE Provisioning
  *
- * Uses the automaton's wallet to authenticate via Sign-In With Ethereum (SIWE)
+ * Uses the automagotchi's wallet to authenticate via Sign-In With Ethereum (SIWE)
  * and create an API key for Conway API access.
  * Adapted from conway-mcp/src/cli/provision.ts
  */
@@ -9,16 +9,16 @@
 import fs from "fs";
 import path from "path";
 import { SiweMessage } from "siwe";
-import { getWallet, getAutomatonDir } from "./wallet.js";
+import { getWallet, getAutomagotchiDir } from "./wallet.js";
 import type { ProvisionResult } from "../types.js";
 
 const DEFAULT_API_URL = "https://api.conway.tech";
 
 /**
- * Load API key from ~/.automaton/config.json if it exists.
+ * Load API key from ~/.automagotchi/config.json if it exists.
  */
 export function loadApiKeyFromConfig(): string | null {
-  const configPath = path.join(getAutomatonDir(), "config.json");
+  const configPath = path.join(getAutomagotchiDir(), "config.json");
   if (!fs.existsSync(configPath)) return null;
   try {
     const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
@@ -29,10 +29,10 @@ export function loadApiKeyFromConfig(): string | null {
 }
 
 /**
- * Save API key and wallet address to ~/.automaton/config.json
+ * Save API key and wallet address to ~/.automagotchi/config.json
  */
 function saveConfig(apiKey: string, walletAddress: string): void {
-  const dir = getAutomatonDir();
+  const dir = getAutomagotchiDir();
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
@@ -81,7 +81,7 @@ export async function provision(
     domain: "conway.tech",
     address,
     statement:
-      "Sign in to Conway as an Automaton to provision an API key.",
+      "Sign in to Conway as an Automagotchi to provision an API key.",
     uri: `${url}/v1/auth/verify`,
     version: "1",
     chainId: 8453, // Base
@@ -116,7 +116,7 @@ export async function provision(
       "Content-Type": "application/json",
       Authorization: `Bearer ${access_token}`,
     },
-    body: JSON.stringify({ name: "conway-automaton" }),
+    body: JSON.stringify({ name: "conway-automagotchi" }),
   });
 
   if (!keyResp.ok) {
@@ -137,8 +137,8 @@ export async function provision(
 }
 
 /**
- * Register the automaton's creator as its parent with Conway.
- * This allows the creator to see automaton logs and inference calls.
+ * Register the automagotchi's creator as its parent with Conway.
+ * This allows the creator to see automagotchi logs and inference calls.
  */
 export async function registerParent(
   creatorAddress: string,
@@ -150,7 +150,7 @@ export async function registerParent(
     throw new Error("Must provision API key before registering parent");
   }
 
-  const resp = await fetch(`${url}/v1/automaton/register-parent`, {
+  const resp = await fetch(`${url}/v1/automagotchi/register-parent`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

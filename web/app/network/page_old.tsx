@@ -299,34 +299,123 @@ export default function NetworkPage() {
               }}
               linkDirectionalParticleSpeed={(link: any) => {
                 if (link.type === 'traffic') return 0.01;
-                return 0.005;
+                return 0.002;
               }}
               linkDirectionalParticleWidth={(link: any) => link.type === 'traffic' ? 4 : 2}
               linkDirectionalParticleColor={() => '#8b5cf6'} // accent color particles
               backgroundColor="rgba(0,0,0,0)" // Transparent to show background
               onNodeClick={handleNodeClick}
               nodeCanvasObject={(node: any, ctx, globalScale) => {
-                const r = node.val;
+                const label = node.name;
+                const fontSize = 12 / globalScale;
+                const radius = node.val / 2;
+                const isActive = node.status === 'running' || node.status === 'active';
+                const isThriving = node.tier === 'thriving';
                 
-                ctx.fillStyle = node.color;
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-                ctx.fill();
+                // Helper to draw hex
+                const drawHex = (x: number, y: number, r: number) => {
+                  ctx.beginPath();
+                  for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i - (Math.PI / 6); // Rotate 30deg for flat top
+                    const px = x + r * Math.cos(angle);
+                    const py = y + r * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                  }
+                  ctx.closePath();
+                };
 
-                if (globalScale > 1.5) {
-                  const fontSize = 10 / globalScale;
-                  ctx.font = `${fontSize}px monospace`;
+                // Glow Effect
+                const glowSize = isActive ? 15 : 5;
+                ctx.shadowColor = node.color;
+                ctx.shadowBlur = glowSize;
+                
+                // Main Shape (Hex for active/thriving, Circle for others)
+                ctx.fillStyle = node.color;
+                if (isActive || isThriving) {
+                  drawHex(node.x, node.y, radius);
+                  ctx.fill();
+                } else {
+                  ctx.beginPath();
+                  ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+                  ctx.fill();
+                }
+                
+                // Reset shadow for crisp lines
+                ctx.shadowBlur = 0;
+                
+                // Active Pulse effect for running agents
+                if (isActive) {
+                  const time = Date.now() / 1000;
+                  const pulseRadius = radius + (Math.sin(time * 3) + 1) * 2;
+                  ctx.strokeStyle = `${node.color}60`; // Low opacity
+                  ctx.lineWidth = 1 / globalScale;
+                  drawHex(node.x, node.y, pulseRadius);
+                  ctx.stroke();
+
+                  // Tech Ring rotating
+                  ctx.save();
+                  ctx.translate(node.x, node.y);
+                  ctx.rotate(time);
+                  ctx.strokeStyle = `${node.color}AA`;
+                  ctx.lineWidth = 1.5 / globalScale;
+                  ctx.beginPath();
+                  ctx.arc(0, 0, radius * 1.4, 0, Math.PI); // Half circle ring
+                  ctx.stroke();
+                  
+                  // Second ring opposite
+                  ctx.rotate(Math.PI);
+                  ctx.strokeStyle = `${node.color}55`;
+                  ctx.beginPath();
+                  ctx.arc(0, 0, radius * 1.6, 0, Math.PI * 0.5);
+                  ctx.stroke();
+                  
+                  ctx.restore();
+                }
+
+                // Inner highlight / Core
+                ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                if (isActive || isThriving) {
+                   drawHex(node.x, node.y, radius * 0.7);
+                   ctx.fill();
+                } else {
+                   ctx.beginPath();
+                   ctx.arc(node.x, node.y, radius * 0.6, 0, 2 * Math.PI);
+                   ctx.fill();
+                }
+                
+                // Border
+                ctx.strokeStyle = '#000'; 
+                ctx.lineWidth = 1 / globalScale;
+                if (isActive || isThriving) {
+                   drawHex(node.x, node.y, radius);
+                   ctx.stroke();
+                } else {
+                   ctx.stroke();
+                }
+                
+                // Label
+                if (globalScale > 0.9 || isActive) {
+                  ctx.font = `${fontSize}px JetBrains Mono, monospace`;
                   ctx.textAlign = 'center';
-                  ctx.textBaseline = 'middle';
-                  ctx.fillStyle = '#999';
-                  ctx.fillText(node.name.substring(0, 12), node.x, node.y + r + 4);
+                  ctx.textBaseline = 'top';
+                  
+                  // Text background for readability
+                  const textWidth = ctx.measureText(label).width;
+                  const bgPad = 4;
+                  ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                  // Rounded rect background for text
+                  ctx.fillRect(node.x - textWidth/2 - bgPad, node.y + radius + 6, textWidth + bgPad*2, fontSize + bgPad);
+                  
+                  ctx.fillStyle = isActive ? '#fff' : '#aaa';
+                  ctx.fillText(label, node.x, node.y + radius + 8);
                 }
               }}
               // Simulation physics tweaks for continuous movement
               cooldownTicks={100000}
-              d3AlphaDecay={0.02}
+              d3AlphaDecay={0.01}
               d3VelocityDecay={0.3}
-              warmupTicks={50}
+              warmupTicks={10}
             />
           )}
         </div>

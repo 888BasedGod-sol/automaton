@@ -183,11 +183,11 @@ function buildAgentCard(agent: any): AgentCard {
     type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
     name: agent.name,
     description: agent.genesis_prompt?.substring(0, 500) || `Autonomous agent: ${agent.name}`,
-    image: `https://automaton.cloud/api/agents/${agent.id}/avatar`,
+    image: `https://automagotchi.cloud/api/agents/${agent.id}/avatar`,
     services: [
       {
         name: 'web',
-        endpoint: `https://automaton.cloud/agents/${agent.id}`,
+        endpoint: `https://automagotchi.cloud/agents/${agent.id}`,
       },
       {
         name: 'agentWallet',

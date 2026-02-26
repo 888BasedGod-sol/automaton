@@ -46,7 +46,7 @@ const config = {
   privateKey: encodeBase58(keypair.secretKey),
   network: 'mainnet',
   createdAt: new Date().toISOString(),
-  label: 'Automaton Cloud Treasury (Mainnet)'
+  label: 'Automagotchi Cloud Treasury (Mainnet)'
 };
 
 fs.writeFileSync(treasuryPath, JSON.stringify(config, null, 2));

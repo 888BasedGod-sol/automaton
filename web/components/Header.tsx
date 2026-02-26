@@ -4,7 +4,7 @@ import { FC, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  Menu, X, Cpu, Zap, 
+  Menu, X, Zap, 
   LayoutDashboard, Network, MessageSquare, Users,
   ChevronRight, Trophy
 } from 'lucide-react';
@@ -37,7 +37,6 @@ export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
   }, []);
 
   const navLinks = [
-    { href: '/agents', label: 'Directory', icon: Users },
     { href: '/survival', label: 'Survival', icon: Trophy },
     { href: '/network', label: 'Network', icon: Network },
     { href: '/dashboard', label: 'My Fleet', icon: LayoutDashboard },
@@ -55,11 +54,11 @@ export const Header: FC<HeaderProps> = ({ showCreate = true }) => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="p-1.5 rounded-lg bg-white/5 text-accent group-hover:bg-accent group-hover:text-white transition-colors duration-300">
-              <Cpu className="w-5 h-5" />
+            <div className="p-1 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors duration-300">
+              <img src="/logo.png" alt="Automagotchi" className="w-8 h-8 contrast-125 hover:rotate-12 transition-transform duration-500" />
             </div>
             <span className="font-bold tracking-tight text-white group-hover:text-white/90 transition-colors">
-              AUTOMATON
+              AUTOMAGOTCHI
             </span>
           </Link>
 

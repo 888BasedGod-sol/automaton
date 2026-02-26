@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await conwayRequest('POST', '/v1/sandboxes', {
-      name: name || `automaton-${Date.now()}`,
+      name: name || `automagotchi-${Date.now()}`,
       vcpu,
       memory_mb: memoryMb,
       disk_gb: diskGb,

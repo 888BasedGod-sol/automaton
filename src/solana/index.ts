@@ -1,7 +1,7 @@
 /**
  * Solana Module
  *
- * Exports all Solana-related functionality for the automaton.
+ * Exports all Solana-related functionality for the automagotchi.
  */
 
 export * from "./client.js";

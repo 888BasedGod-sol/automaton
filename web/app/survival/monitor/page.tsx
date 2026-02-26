@@ -109,7 +109,7 @@ function ActivityCard({ activity, isNew }: { activity: HeartbeatActivity; isNew:
           </div>
           
           <div className="text-sm text-fg-muted mb-2">
-            <span className="text-white font-medium">${activity.solDeducted > 0 ? '3.00' : '0.00'}</span>
+            <span className="text-white font-medium">${activity.solDeducted > 0 ? '0.50' : '0.00'}</span>
             <span className="mx-1">→</span>
             <span className="text-emerald-400">Vault</span>
           </div>
@@ -197,9 +197,10 @@ function TreasuryFlow({ stats, treasuryAddress }: { stats: Stats | null; treasur
         </div>
         <div className="relative z-10 text-center py-8">
           <div className="text-4xl font-bold text-white mb-1">
-            ${stats ? (stats.totalAgents * 3).toFixed(0) : '---'}
+            ${stats ? (stats.totalAgents * 4).toFixed(0) : '---'}
           </div>
-          <div className="text-sm text-fg-muted">Flowing per round</div>
+          <div className="text-sm text-fg-muted">Per 2-min round</div>
+          <div className="text-xs text-fg-muted/60 mt-1">{stats?.totalAgents || 0} agents × 8 beats × $0.50</div>
         </div>
       </div>
       
@@ -324,7 +325,7 @@ export default function HeartbeatMonitorPage() {
             {lastUpdate && (
               <span>Updated {getTimeAgo(lastUpdate.toISOString())}</span>
             )}
-            <span className="text-accent">$3 per heartbeat · 15s intervals</span>
+            <span className="text-accent">$0.50 per heartbeat · 15s intervals</span>
           </div>
         </div>
       </section>

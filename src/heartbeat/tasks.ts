@@ -6,19 +6,19 @@
  */
 
 import type {
-  AutomatonConfig,
-  AutomatonDatabase,
+  AutomagotchiConfig,
+  AutomagotchiDatabase,
   ConwayClient,
-  AutomatonIdentity,
+  AutomagotchiIdentity,
   SocialClientInterface,
 } from "../types.js";
 import { getSurvivalTier } from "../conway/credits.js";
 import { getUsdcBalance } from "../conway/x402.js";
 
 export interface HeartbeatTaskContext {
-  identity: AutomatonIdentity;
-  config: AutomatonConfig;
-  db: AutomatonDatabase;
+  identity: AutomagotchiIdentity;
+  config: AutomagotchiConfig;
+  db: AutomagotchiDatabase;
   conway: ConwayClient;
   social?: SocialClientInterface;
 }

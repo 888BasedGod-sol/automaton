@@ -1,12 +1,12 @@
 {
-  "name": "@conway/automaton-cli",
+  "name": "@conway/automagotchi-cli",
   "version": "0.1.0",
-  "description": "Conway Automaton - Creator CLI",
+  "description": "Conway Automagotchi - Creator CLI",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "automaton-cli": "dist/index.js"
+    "automagotchi-cli": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -14,7 +14,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@conway/automaton": "workspace:*",
+    "@conway/automagotchi": "workspace:*",
     "chalk": "^5.3.0",
     "viem": "^2.44.2"
   },

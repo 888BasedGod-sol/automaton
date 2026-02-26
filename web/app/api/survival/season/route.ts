@@ -6,6 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getSharedConnection, AUTOMAGOTCHI_TREASURY_ADDRESS } from '@/lib/compute-payment';
 import { 
   getCurrentSeason, 
   createSeason,
@@ -31,6 +33,19 @@ export async function GET(request: NextRequest) {
     await ensureInit();
 
     const current = await getCurrentSeason();
+
+    // Fetch real treasury balance
+    if (current) {
+      try {
+        const connection = getSharedConnection();
+        const treasuryPubkey = new PublicKey(AUTOMAGOTCHI_TREASURY_ADDRESS);
+        const balance = await connection.getBalance(treasuryPubkey);
+        // Overwrite prizePool with real balance
+        (current as any).prizePool = balance / LAMPORTS_PER_SOL;
+      } catch (err) {
+        console.error("Failed to fetch treasury balance:", err);
+      }
+    }
 
     // Also get upcoming and past seasons
     const upcomingResult = await query(`
@@ -82,7 +97,7 @@ export async function POST(request: NextRequest) {
     const { action, adminKey } = body;
 
     // Simple admin key check (in production, use proper auth)
-    const expectedKey = process.env.SURVIVAL_ADMIN_KEY || 'automaton-survival-admin';
+    const expectedKey = process.env.SURVIVAL_ADMIN_KEY || 'automagotchi-survival-admin';
     if (adminKey !== expectedKey) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },

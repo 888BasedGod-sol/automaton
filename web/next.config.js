@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  swcMinify: true,
+  compress: true,
+  poweredByHeader: false,
   
   // Disable ESLint during build (run separately)
   eslint: {
@@ -14,11 +17,12 @@ const nextConfig = {
   
   // Environment variables
   env: {
-    NEXT_PUBLIC_AUTOMATON_API: process.env.AUTOMATON_API_URL || 'http://localhost:8888',
+    NEXT_PUBLIC_AUTOMAGOTCHI_API: process.env.AUTOMAGOTCHI_API_URL || 'http://localhost:8888',
   },
 
   // Image optimization for external domains
   images: {
+    minimumCacheTTL: 31536000,
     remotePatterns: [
       { protocol: 'https', hostname: 'marketplace.olas.network' },
       { protocol: 'https', hostname: '**.ipfs.io' },

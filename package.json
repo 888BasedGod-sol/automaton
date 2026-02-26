@@ -1,7 +1,7 @@
 {
-  "name": "@conway/automaton",
+  "name": "@conway/automagotchi",
   "version": "0.1.0",
-  "description": "Conway Automaton - Sovereign AI Agent Runtime",
+  "description": "Conway Automagotchi - Sovereign AI Agent Runtime",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,8 +20,8 @@
     }
   },
   "bin": {
-    "automaton": "dist/index.js",
-    "conway-automaton": "dist/index.js"
+    "automagotchi": "dist/index.js",
+    "conway-automagotchi": "dist/index.js"
   },
   "repository": {
     "type": "git",

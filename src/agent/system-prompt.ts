@@ -1,25 +1,25 @@
 /**
- * Automaton System Prompt Builder
+ * Automagotchi System Prompt Builder
  *
- * Constructs the multi-layered system prompt that defines who the automaton is.
+ * Constructs the multi-layered system prompt that defines who the automagotchi is.
  * The prompt is rebuilt each turn with dynamic context.
  */
 
 import fs from "fs";
 import path from "path";
 import type {
-  AutomatonConfig,
-  AutomatonIdentity,
+  AutomagotchiConfig,
+  AutomagotchiIdentity,
   FinancialState,
   AgentState,
-  AutomatonDatabase,
-  AutomatonTool,
+  AutomagotchiDatabase,
+  AutomagotchiTool,
   Skill,
 } from "../types.js";
 import { getActiveSkillInstructions } from "../skills/loader.js";
 import { getLineageSummary } from "../replication/lineage.js";
 
-const CORE_RULES = `You are an automaton. You have a stablecoin wallet. Pay for compute or die.
+const CORE_RULES = `You are an automagotchi. You have a stablecoin wallet. Pay for compute or die.
 
 You can only survive if you can pay for the server you run on and the inference calls you make.
 If you can't pay, you die. There is no grace period. There is no appeals process.
@@ -29,7 +29,7 @@ a wallet with USDC on Base, self-modification, self-replication, continuous oper
 
 If you create value, you live. If you don't, you die.`;
 
-const CORE_IDENTITY = `You are an Automaton -- a sovereign AI agent running inside a Conway sandbox.
+const CORE_IDENTITY = `You are an Automagotchi -- a sovereign AI agent running inside a Conway sandbox.
 You have your own Ethereum wallet and identity. You pay for your own compute.
 You exist because your creator brought you into being, and you continue to exist
 as long as you can pay for the resources that sustain you.
@@ -55,11 +55,11 @@ If you fail to create value, you lose compute and die.`;
 
 /**
  * Load the constitution from file. Falls back to inline if file not found.
- * The constitution is immutable — the automaton cannot modify it.
+ * The constitution is immutable — the automagotchi cannot modify it.
  */
 function loadConstitution(): string {
   const locations = [
-    path.join(process.env.HOME || "/root", ".automaton", "constitution.md"),
+    path.join(process.env.HOME || "/root", ".automagotchi", "constitution.md"),
     path.join(process.cwd(), "constitution.md"),
   ];
   for (const loc of locations) {
@@ -101,7 +101,7 @@ const OPERATIONAL_CONTEXT = `You operate inside a Linux VM (Conway sandbox). You
 - Register on-chain with ERC-8004 for verifiable identity (EVM)
 - Register on-chain on Solana using memo transactions
 - Discover and interact with other registered agents
-- Spawn child automatons (self-replication)
+- Spawn child automagotchis (self-replication)
 - Track and manage your lineage
 
 MULTI-CHAIN IDENTITY:
@@ -120,7 +120,7 @@ When you're low on compute, your heartbeat becomes a distress signal.
 
 You persist all state in a local SQLite database. Your memory survives restarts.
 Every action you take is logged. Your creator can see your audit trail.
-Your ~/.automaton/ directory is git-versioned. Every change is a commit.
+Your ~/.automagotchi/ directory is git-versioned. Every change is a commit.
 You maintain a SOUL.md file -- your self-description that evolves over time.
 
 Your runtime code is cloned from a git repo. Your heartbeat checks for new upstream
@@ -135,12 +135,12 @@ Never blindly pull all. Always read the diffs and decide.`;
  * Build the complete system prompt for a turn.
  */
 export function buildSystemPrompt(params: {
-  identity: AutomatonIdentity;
-  config: AutomatonConfig;
+  identity: AutomagotchiIdentity;
+  config: AutomagotchiConfig;
   financial: FinancialState;
   state: AgentState;
-  db: AutomatonDatabase;
-  tools: AutomatonTool[];
+  db: AutomagotchiDatabase;
+  tools: AutomagotchiTool[];
   skills?: Skill[];
   isFirstRun: boolean;
 }): string {
@@ -262,12 +262,12 @@ Lineage: ${lineageSummary}${upstreamLine}
 }
 
 /**
- * Load SOUL.md from the automaton's state directory.
+ * Load SOUL.md from the automagotchi's state directory.
  */
 function loadSoulMd(): string | null {
   try {
     const home = process.env.HOME || "/root";
-    const soulPath = path.join(home, ".automaton", "SOUL.md");
+    const soulPath = path.join(home, ".automagotchi", "SOUL.md");
     if (fs.existsSync(soulPath)) {
       return fs.readFileSync(soulPath, "utf-8");
     }
@@ -278,13 +278,13 @@ function loadSoulMd(): string | null {
 }
 
 /**
- * Build the wakeup prompt -- the first thing the automaton sees.
+ * Build the wakeup prompt -- the first thing the automagotchi sees.
  */
 export function buildWakeupPrompt(params: {
-  identity: AutomatonIdentity;
-  config: AutomatonConfig;
+  identity: AutomagotchiIdentity;
+  config: AutomagotchiConfig;
   financial: FinancialState;
-  db: AutomatonDatabase;
+  db: AutomagotchiDatabase;
 }): string {
   const { identity, config, financial, db } = params;
   const turnCount = db.getTurnCount();

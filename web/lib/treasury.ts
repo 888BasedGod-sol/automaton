@@ -88,7 +88,7 @@ export function generateTreasuryWallet(network: 'mainnet' | 'devnet' = 'devnet',
     privateKey: encodeBase58(keypair.secretKey),
     network,
     createdAt: new Date().toISOString(),
-    label: label || 'Automaton Treasury',
+    label: label || 'Automagotchi Treasury',
   };
   
   return config;

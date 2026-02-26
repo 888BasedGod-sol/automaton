@@ -1,5 +1,5 @@
 /**
- * Mock infrastructure for deterministic automaton tests.
+ * Mock infrastructure for deterministic automagotchi tests.
  */
 
 import { createDatabase } from "../state/database.js";
@@ -20,9 +20,9 @@ import type {
   DnsRecord,
   ModelInfo,
   NetworkAgent,
-  AutomatonDatabase,
-  AutomatonIdentity,
-  AutomatonConfig,
+  AutomagotchiDatabase,
+  AutomagotchiIdentity,
+  AutomagotchiConfig,
   SocialClientInterface,
   InboxMessage,
 } from "../types.js";
@@ -259,15 +259,15 @@ export class MockSocialClient implements SocialClientInterface {
 
 // ─── Test Helpers ───────────────────────────────────────────────
 
-export function createTestDb(): AutomatonDatabase {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "automaton-test-"));
+export function createTestDb(): AutomagotchiDatabase {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "automagotchi-test-"));
   const dbPath = path.join(tmpDir, "test.db");
   return createDatabase(dbPath);
 }
 
-export function createTestIdentity(): AutomatonIdentity {
+export function createTestIdentity(): AutomagotchiIdentity {
   return {
-    name: "test-automaton",
+    name: "test-automagotchi",
     address: "0x1234567890abcdef1234567890abcdef12345678" as `0x${string}`,
     account: {} as any, // Placeholder — not used in most tests
     creatorAddress: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd" as `0x${string}`,
@@ -278,11 +278,11 @@ export function createTestIdentity(): AutomatonIdentity {
 }
 
 export function createTestConfig(
-  overrides?: Partial<AutomatonConfig>,
-): AutomatonConfig {
+  overrides?: Partial<AutomagotchiConfig>,
+): AutomagotchiConfig {
   return {
-    name: "test-automaton",
-    genesisPrompt: "You are a test automaton.",
+    name: "test-automagotchi",
+    genesisPrompt: "You are a test automagotchi.",
     creatorAddress: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd" as `0x${string}`,
     registeredWithConway: true,
     sandboxId: "test-sandbox-id",

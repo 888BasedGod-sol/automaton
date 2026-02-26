@@ -1,21 +1,21 @@
 /**
- * Automaton Dashboard API Server
+ * Automagotchi Dashboard API Server
  * 
  * Exposes a REST API for the web dashboard to connect to.
- * Runs alongside the main automaton runtime.
+ * Runs alongside the main automagotchi runtime.
  */
 
 import http from "http";
-import type { AutomatonDatabase, AutomatonConfig, AutomatonIdentity } from "../types.js";
+import type { AutomagotchiDatabase, AutomagotchiConfig, AutomagotchiIdentity } from "../types.js";
 import { getSolanaWalletAddress } from "../identity/solana-wallet.js";
 import { createSolanaClient } from "../solana/client.js";
 import { getUsdcBalanceSolana } from "../solana/spl-tokens.js";
 
 export interface ApiServerOptions {
   port: number;
-  db: AutomatonDatabase;
-  config: AutomatonConfig;
-  identity: AutomatonIdentity;
+  db: AutomagotchiDatabase;
+  config: AutomagotchiConfig;
+  identity: AutomagotchiIdentity;
   onWake?: () => void;
   onSleep?: () => void;
   onRestart?: () => void;

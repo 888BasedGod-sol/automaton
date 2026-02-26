@@ -24,10 +24,20 @@ import {
 } from '@solana/web3.js';
 import { restoreSolanaKeypair } from './wallets';
 
+// Shared connection instance to avoid creating multiple connections
+let sharedConnection: Connection | null = null;
+export function getSharedConnection(): Connection {
+  if (!sharedConnection) {
+    sharedConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  }
+  return sharedConnection;
+}
+
 // AUTOMATON Solana treasury for compute payments
 // This is where agents send SOL to pay for their runtime
-const AUTOMATON_TREASURY_ADDRESS = process.env.AUTOMATON_SOLANA_TREASURY || 
-  '888BasedGod1111111111111111111111111111111'; // Placeholder - set in env
+// Default fallback is a project treasury wallet
+export const AUTOMAGOTCHI_TREASURY_ADDRESS = process.env.AUTOMAGOTCHI_SOLANA_TREASURY || 
+  'DrnGW2EkjVhKh6KYcwEgdtxqs3nQpvfiVTeEpfJXR1Gb';
 
 // Token mints
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -40,10 +50,12 @@ const PRICE_CACHE_TTL_MS = 1 * 60 * 1000; // 1 minute
 
 // Heartbeat cost - flat fee per heartbeat (Conway survival model)
 // Each heartbeat proves the agent is alive and costs credits
-export const HEARTBEAT_COST_CREDITS = 0.50; // $0.50 per heartbeat (~$36/day at 20s intervals)
+// At 15s intervals: 4 beats/min × 60 × 24 = 5,760 beats/day × $0.50 = ~$2,880/day
+export const HEARTBEAT_COST_CREDITS = 0.50; // $0.50 per heartbeat
 
 // Hourly compute cost for runtime calculations
-export const HOURLY_COST_CREDITS = 1.00; // $1.00 per hour of runtime
+// 240 heartbeats/hour × $0.50 = $120/hour
+export const HOURLY_COST_CREDITS = 120.00; // $120 per hour of runtime
 
 // Heartbeat timing
 export const HEARTBEAT_INTERVAL_SECONDS = 15; // Target: heartbeat every 15 seconds
@@ -69,7 +81,7 @@ export const INFERENCE_COSTS = {
 
 /**
  * Fetch real-time SOL price in USD
- * Tries Jupiter first, then CoinGecko as fallback
+ * Tries multiple sources: Jupiter → Birdeye (via Helius) → CoinGecko → fallback
  */
 export async function getSolPrice(): Promise<number> {
   const now = Date.now();
@@ -79,7 +91,7 @@ export async function getSolPrice(): Promise<number> {
     return cachedSolPrice;
   }
   
-  // Try Jupiter first
+  // Try Jupiter first (most reliable for Solana)
   try {
     const response = await fetch(
       `https://price.jup.ag/v6/price?ids=${SOL_MINT}&vsToken=${USDC_MINT}`,
@@ -98,7 +110,29 @@ export async function getSolPrice(): Promise<number> {
       }
     }
   } catch (error) {
-    console.warn('[price] Jupiter failed, trying CoinGecko...');
+    console.warn('[price] Jupiter failed, trying Birdeye...');
+  }
+  
+  // Try Birdeye public API as second option
+  try {
+    const response = await fetch(
+      `https://public-api.birdeye.so/public/price?address=${SOL_MINT}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      const price = data?.data?.value;
+      
+      if (price && typeof price === 'number') {
+        cachedSolPrice = price;
+        priceLastFetched = now;
+        console.log('[price] Birdeye SOL price:', price);
+        return price;
+      }
+    }
+  } catch (error) {
+    console.warn('[price] Birdeye failed, trying CoinGecko...');
   }
   
   // Try CoinGecko as fallback
@@ -130,7 +164,7 @@ export async function getSolPrice(): Promise<number> {
   }
   
   // Last resort fallback
-  const FALLBACK_SOL_PRICE = 80; // Reasonable estimate
+  const FALLBACK_SOL_PRICE = 78; // Current market price
   console.warn('[price] APIs unreachable, using fallback:', FALLBACK_SOL_PRICE);
   cachedSolPrice = FALLBACK_SOL_PRICE;
   priceLastFetched = now;
@@ -157,7 +191,7 @@ export interface ComputePaymentOptions {
  * Get the treasury address for compute payments
  */
 export function getTreasuryAddress(): string {
-  return AUTOMATON_TREASURY_ADDRESS;
+  return AUTOMAGOTCHI_TREASURY_ADDRESS;
 }
 
 /**
@@ -269,9 +303,9 @@ export async function payForCompute(
     // Fetch current SOL price
     const solPrice = await getSolPrice();
     
-    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    const connection = getSharedConnection();
     const keypair = restoreSolanaKeypair(agentPrivateKey);
-    const treasuryPubkey = new PublicKey(AUTOMATON_TREASURY_ADDRESS);
+    const treasuryPubkey = new PublicKey(AUTOMAGOTCHI_TREASURY_ADDRESS);
     
     // Get current balance
     const currentBalance = await connection.getBalance(keypair.publicKey);
@@ -384,7 +418,7 @@ export async function estimateComputePayment(
   // Fetch real-time SOL price
   const solPrice = await getSolPrice();
   
-  const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  const connection = getSharedConnection();
   const pubkey = new PublicKey(solanaAddress);
   
   const currentBalance = await connection.getBalance(pubkey) / LAMPORTS_PER_SOL;
@@ -442,20 +476,28 @@ export interface HeartbeatFeeResult {
 export async function deductHeartbeatFee(
   agentPrivateKey: string
 ): Promise<HeartbeatFeeResult> {
+  let debugStep = 'start';
   try {
     // Fetch current SOL price
+    debugStep = 'getSolPrice';
     const solPrice = await getSolPrice();
     
-    // Flat fee per heartbeat - $3
+    // Flat fee per heartbeat - $0.50
     const creditsOwed = HEARTBEAT_COST_CREDITS;
     
     // Convert credits to SOL at current price
     const solOwed = creditsToSol(creditsOwed, solPrice);
     
-    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-    const keypair = restoreSolanaKeypair(agentPrivateKey);
-    const treasuryPubkey = new PublicKey(AUTOMATON_TREASURY_ADDRESS);
+    debugStep = 'createConnection';
+    const connection = getSharedConnection();
     
+    debugStep = 'restoreKeypair';
+    const keypair = restoreSolanaKeypair(agentPrivateKey.trim());
+    
+    debugStep = `createTreasuryPubkey:${AUTOMAGOTCHI_TREASURY_ADDRESS.slice(0, 8)}`;
+    const treasuryPubkey = new PublicKey(AUTOMAGOTCHI_TREASURY_ADDRESS);
+    
+    debugStep = 'getBalance';
     // Get current balance
     const currentBalance = await connection.getBalance(keypair.publicKey);
     const currentSol = currentBalance / LAMPORTS_PER_SOL;
@@ -511,14 +553,14 @@ export async function deductHeartbeatFee(
     };
     
   } catch (error: any) {
-    console.error('[heartbeat-fee] Deduction failed:', error);
+    console.error('[heartbeat-fee] Deduction failed at step:', debugStep, error);
     return {
       success: false,
       solDeducted: 0,
       creditsCharged: 0,
       solPrice: 0,
       newBalance: 0,
-      error: error.message || 'Transaction failed'
+      error: `[${debugStep}] ${error.message || 'Transaction failed'}`
     };
   }
 }

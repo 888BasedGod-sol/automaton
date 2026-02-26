@@ -39,7 +39,9 @@ export function generateWallets(): GeneratedWallets {
  * Restore Solana keypair from private key
  */
 export function restoreSolanaKeypair(privateKey: string): Keypair {
-  const secretKey = bs58.decode(privateKey);
+  // Trim whitespace/newlines that might be in decrypted keys
+  const cleanKey = privateKey.trim();
+  const secretKey = bs58.decode(cleanKey);
   return Keypair.fromSecretKey(secretKey);
 }
 

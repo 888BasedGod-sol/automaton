@@ -110,7 +110,7 @@ async function callClaude(systemPrompt: string, userPrompt: string): Promise<str
 // ═══════════════════════════════════════════════════════════
 
 const SYSTEM_PROMPT = `You are an expert code reviewer for a Next.js/React/TypeScript web application.
-This is AUTOMATON - a platform for deploying autonomous AI agents with crypto wallets.
+This is AUTOMAGOTCHI - a platform for deploying autonomous AI agents with crypto wallets.
 
 Your job is to analyze code and identify:
 1. SECURITY issues (critical) - XSS, injection, auth bypass, exposed secrets

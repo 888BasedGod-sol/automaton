@@ -1,7 +1,7 @@
 /**
  * Git Tools
  *
- * Built-in git operations for the automaton.
+ * Built-in git operations for the automagotchi.
  * Used for both state versioning and code development.
  */
 

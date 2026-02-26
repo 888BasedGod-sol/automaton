@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 // ERC-8004 Identity Registry on Base
 const IDENTITY_CONTRACT = '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432' as Address;
 
-// Automaton Cloud Registry - tracks which agents are deployed through our platform
-const AUTOMATON_REGISTRY_OWNER = '0xd3d03f57c60bBEFE645cd6Bb14f1CE2c1915e898' as Address;
+// Automagotchi Cloud Registry - tracks which agents are deployed through our platform
+const AUTOMAGOTCHI_REGISTRY_OWNER = '0xd3d03f57c60bBEFE645cd6Bb14f1CE2c1915e898' as Address;
 
 const IDENTITY_ABI = parseAbi([
   'function tokenURI(uint256 tokenId) external view returns (string)',
@@ -25,7 +25,7 @@ interface VerificationResult {
     exists: boolean;
     owner: string | null;
     metadataUrl: string | null;
-    isAutomatonDeployed: boolean;
+    isAutomagotchiDeployed: boolean;
   };
   database: {
     exists: boolean;
@@ -38,7 +38,7 @@ interface VerificationResult {
 /**
  * GET /api/agents/verify?id=<agentId>&address=<evmAddress>
  * 
- * Verify if an agent is properly deployed on Automaton Cloud and registered on-chain
+ * Verify if an agent is properly deployed on Automagotchi Cloud and registered on-chain
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -86,7 +86,7 @@ async function verifyAgent(params: {
     return {
       verified: false,
       agentId: null,
-      onChain: { exists: false, owner: null, metadataUrl: null, isAutomatonDeployed: false },
+      onChain: { exists: false, owner: null, metadataUrl: null, isAutomagotchiDeployed: false },
       database: { exists: false, erc8004Id: null, status: null },
       message: 'Database not configured',
     };
@@ -127,33 +127,33 @@ async function verifyAgent(params: {
           exists: true,
           owner: owner as string,
           metadataUrl: metadataUrl as string | null,
-          isAutomatonDeployed: (owner as string).toLowerCase() === AUTOMATON_REGISTRY_OWNER.toLowerCase(),
+          isAutomagotchiDeployed: (owner as string).toLowerCase() === AUTOMAGOTCHI_REGISTRY_OWNER.toLowerCase(),
         };
       }
     } catch (e) {
       // Token doesn't exist on-chain
-      onChainData = { exists: false, owner: null, metadataUrl: null, isAutomatonDeployed: false };
+      onChainData = { exists: false, owner: null, metadataUrl: null, isAutomagotchiDeployed: false };
     }
   }
 
   // Determine verification status
   const dbExists = !!dbAgent;
   const onChainExists = onChainData?.exists || false;
-  const isAutomatonDeployed = onChainData?.isAutomatonDeployed || false;
+  const isAutomagotchiDeployed = onChainData?.isAutomagotchiDeployed || false;
 
   let verified = false;
   let message = '';
 
-  if (dbExists && onChainExists && isAutomatonDeployed) {
+  if (dbExists && onChainExists && isAutomagotchiDeployed) {
     verified = true;
-    message = 'Agent is fully verified: registered in database and deployed on-chain via Automaton';
+    message = 'Agent is fully verified: registered in database and deployed on-chain via Automagotchi';
   } else if (dbExists && onChainExists) {
     verified = true;
-    message = 'Agent is registered on-chain but not deployed via Automaton Cloud';
+    message = 'Agent is registered on-chain but not deployed via Automagotchi Cloud';
   } else if (dbExists && !onChainExists) {
     message = 'Agent exists in database but not yet registered on-chain';
   } else if (!dbExists && onChainExists) {
-    message = 'Agent exists on-chain but not in Automaton database';
+    message = 'Agent exists on-chain but not in Automagotchi database';
   } else {
     message = 'Agent not found';
   }
@@ -161,7 +161,7 @@ async function verifyAgent(params: {
   return {
     verified,
     agentId: dbAgent?.id || null,
-    onChain: onChainData || { exists: false, owner: null, metadataUrl: null, isAutomatonDeployed: false },
+    onChain: onChainData || { exists: false, owner: null, metadataUrl: null, isAutomagotchiDeployed: false },
     database: {
       exists: dbExists,
       erc8004Id: dbAgent?.erc8004_id || null,

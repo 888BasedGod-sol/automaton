@@ -1,7 +1,7 @@
 /**
  * Conway Credits Management
  *
- * Monitors the automaton's compute credit balance and triggers
+ * Monitors the automagotchi's compute credit balance and triggers
  * survival mode transitions.
  */
 
@@ -9,12 +9,12 @@ import type {
   ConwayClient,
   FinancialState,
   SurvivalTier,
-  AutomatonDatabase,
+  AutomagotchiDatabase,
 } from "../types.js";
 import { SURVIVAL_THRESHOLDS } from "../types.js";
 
 /**
- * Check the current financial state of the automaton.
+ * Check the current financial state of the automagotchi.
  */
 export async function checkFinancialState(
   conway: ConwayClient,
@@ -51,7 +51,7 @@ export function formatCredits(cents: number): string {
  * Log a credit check to the database.
  */
 export function logCreditCheck(
-  db: AutomatonDatabase,
+  db: AutomagotchiDatabase,
   state: FinancialState,
 ): void {
   const { ulid } = await_ulid();

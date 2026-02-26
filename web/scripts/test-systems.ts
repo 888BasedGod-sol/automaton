@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * AUTOMATON Website System Test Suite
+ * AUTOMAGOTCHI Website System Test Suite
  * 
  * Tests all API endpoints and generates a report.
  * Run with: npx tsx scripts/test-systems.ts
  */
 
-const BASE_URL = process.env.BASE_URL || 'https://automaton.cloud';
+const BASE_URL = process.env.BASE_URL || 'https://automagotchi.cloud';
 const TEST_AGENT_ID = process.env.TEST_AGENT_ID || '00000000-0000-0000-0000-000000000000';
 const TEST_WALLET = process.env.TEST_WALLET || '5FHwkrdxUTMqMDjpE8FhTVzgKJiRLGHJQWEGKPGdKBBq';
 
@@ -84,7 +84,7 @@ async function testEndpoint(
 }
 
 async function runTests() {
-  console.log('\n🧪 AUTOMATON SYSTEM TEST SUITE');
+  console.log('\n🧪 AUTOMAGOTCHI SYSTEM TEST SUITE');
   console.log('═'.repeat(60));
   console.log(`Base URL: ${BASE_URL}`);
   console.log(`Started: ${new Date().toISOString()}\n`);

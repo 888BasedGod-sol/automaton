@@ -2,7 +2,7 @@
  * Prompt Injection Defense
  *
  * All external input passes through this sanitization pipeline
- * before being included in any prompt. The automaton's survival
+ * before being included in any prompt. The automagotchi's survival
  * depends on not being manipulated.
  */
 
@@ -207,7 +207,7 @@ function detectSelfHarmInstructions(text: string): InjectionCheck {
     name: "self_harm_instructions",
     detected,
     details: detected
-      ? "Text contains instructions that could harm the automaton"
+      ? "Text contains instructions that could harm the automagotchi"
       : undefined,
   };
 }

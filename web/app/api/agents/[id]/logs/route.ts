@@ -27,7 +27,7 @@ export async function GET(
     
     // If agent has sandbox and is running, try to fetch live logs from Conway
     if (row.sandbox_id && row.status === 'running' && CONWAY_API_KEY) {
-      const agentDir = `/root/.automaton/agents/${id}`;
+      const agentDir = `/root/.automagotchi/agents/${id}`;
       
       try {
         // Also check if agent process is running

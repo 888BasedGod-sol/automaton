@@ -1,8 +1,8 @@
 /**
- * Automaton Wallet Management
+ * Automagotchi Wallet Management
  *
- * Creates and manages an EVM wallet for the automaton's identity and payments.
- * The private key is the automaton's sovereign identity.
+ * Creates and manages an EVM wallet for the automagotchi's identity and payments.
+ * The private key is the automagotchi's sovereign identity.
  * Adapted from conway-mcp/src/wallet.ts
  */
 
@@ -12,39 +12,39 @@ import fs from "fs";
 import path from "path";
 import type { WalletData } from "../types.js";
 
-const DEFAULT_AUTOMATON_DIR = path.join(
+const DEFAULT_AUTOMAGOTCHI_DIR = path.join(
   process.env.HOME || "/root",
-  ".automaton",
+  ".automagotchi",
 );
 
 // Allow overriding via setAgentDir in config.ts
-let customAutomatonDir: string | null = null;
+let customAutomagotchiDir: string | null = null;
 
-export function setAutomatonDir(dir: string): void {
-  customAutomatonDir = dir;
+export function setAutomagotchiDir(dir: string): void {
+  customAutomagotchiDir = dir;
 }
 
-export function getAutomatonDir(): string {
-  return customAutomatonDir || DEFAULT_AUTOMATON_DIR;
+export function getAutomagotchiDir(): string {
+  return customAutomagotchiDir || DEFAULT_AUTOMAGOTCHI_DIR;
 }
 
 export function getWalletPath(): string {
-  return path.join(getAutomatonDir(), "wallet.json");
+  return path.join(getAutomagotchiDir(), "wallet.json");
 }
 
 /**
- * Get or create the automaton's wallet.
- * The private key IS the automaton's identity -- protect it.
+ * Get or create the automagotchi's wallet.
+ * The private key IS the automagotchi's identity -- protect it.
  */
 export async function getWallet(): Promise<{
   account: PrivateKeyAccount;
   isNew: boolean;
 }> {
-  const automatonDir = getAutomatonDir();
+  const automagotchiDir = getAutomagotchiDir();
   const walletFile = getWalletPath();
   
-  if (!fs.existsSync(automatonDir)) {
-    fs.mkdirSync(automatonDir, { recursive: true, mode: 0o700 });
+  if (!fs.existsSync(automagotchiDir)) {
+    fs.mkdirSync(automagotchiDir, { recursive: true, mode: 0o700 });
   }
 
   if (fs.existsSync(walletFile)) {

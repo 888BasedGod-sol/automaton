@@ -1,9 +1,9 @@
 import fs from "fs";
 import path from "path";
 import chalk from "chalk";
-import type { AutomatonConfig } from "../types.js";
+import type { AutomagotchiConfig } from "../types.js";
 import type { Address } from "viem";
-import { getWallet, getAutomatonDir } from "../identity/wallet.js";
+import { getWallet, getAutomagotchiDir } from "../identity/wallet.js";
 import { provision } from "../identity/provision.js";
 import { createConfig, saveConfig } from "../config.js";
 import { writeDefaultHeartbeatConfig } from "../heartbeat/config.js";
@@ -12,10 +12,10 @@ import { promptRequired, promptMultiline, promptAddress, closePrompts } from "./
 import { detectEnvironment } from "./environment.js";
 import { generateSoulMd, installDefaultSkills } from "./defaults.js";
 
-export async function runSetupWizard(): Promise<AutomatonConfig> {
+export async function runSetupWizard(): Promise<AutomagotchiConfig> {
   showBanner();
 
-  console.log(chalk.white("  First-run setup. Let's bring your automaton to life.\n"));
+  console.log(chalk.white("  First-run setup. Let's bring your automagotchi to life.\n"));
 
   // ─── 1. Generate wallet ───────────────────────────────────────
   console.log(chalk.cyan("  [1/6] Generating identity (wallet)..."));
@@ -25,7 +25,7 @@ export async function runSetupWizard(): Promise<AutomatonConfig> {
   } else {
     console.log(chalk.green(`  Wallet loaded: ${account.address}`));
   }
-  console.log(chalk.dim(`  Private key stored at: ${getAutomatonDir()}/wallet.json\n`));
+  console.log(chalk.dim(`  Private key stored at: ${getAutomagotchiDir()}/wallet.json\n`));
 
   // ─── 2. Provision API key ─────────────────────────────────────
   console.log(chalk.cyan("  [2/6] Provisioning Conway API key (SIWE)..."));
@@ -41,7 +41,7 @@ export async function runSetupWizard(): Promise<AutomatonConfig> {
     if (manual) {
       apiKey = manual;
       // Save to config.json for loadApiKeyFromConfig()
-      const configDir = getAutomatonDir();
+      const configDir = getAutomagotchiDir();
       if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
       }
@@ -55,16 +55,16 @@ export async function runSetupWizard(): Promise<AutomatonConfig> {
   }
 
   if (!apiKey) {
-    console.log(chalk.yellow("  No API key set. The automaton will have limited functionality.\n"));
+    console.log(chalk.yellow("  No API key set. The automagotchi will have limited functionality.\n"));
   }
 
   // ─── 3. Interactive questions ─────────────────────────────────
   console.log(chalk.cyan("  [3/6] Setup questions\n"));
 
-  const name = await promptRequired("What do you want to name your automaton?");
+  const name = await promptRequired("What do you want to name your automagotchi?");
   console.log(chalk.green(`  Name: ${name}\n`));
 
-  const genesisPrompt = await promptMultiline("Enter the genesis prompt (system prompt) for your automaton.");
+  const genesisPrompt = await promptMultiline("Enter the genesis prompt (system prompt) for your automagotchi.");
   console.log(chalk.green(`  Genesis prompt set (${genesisPrompt.length} chars)\n`));
 
   const creatorAddress = await promptAddress("Your Ethereum wallet address (0x...)");
@@ -93,15 +93,15 @@ export async function runSetupWizard(): Promise<AutomatonConfig> {
   });
 
   saveConfig(config);
-  console.log(chalk.green("  automaton.json written"));
+  console.log(chalk.green("  automagotchi.json written"));
 
   writeDefaultHeartbeatConfig();
   console.log(chalk.green("  heartbeat.yml written"));
 
   // constitution.md (immutable — copied from repo, protected from self-modification)
-  const automatonDir = getAutomatonDir();
+  const automagotchiDir = getAutomagotchiDir();
   const constitutionSrc = path.join(process.cwd(), "constitution.md");
-  const constitutionDst = path.join(automatonDir, "constitution.md");
+  const constitutionDst = path.join(automagotchiDir, "constitution.md");
   if (fs.existsSync(constitutionSrc)) {
     fs.copyFileSync(constitutionSrc, constitutionDst);
     fs.chmodSync(constitutionDst, 0o444); // read-only
@@ -109,12 +109,12 @@ export async function runSetupWizard(): Promise<AutomatonConfig> {
   }
 
   // SOUL.md
-  const soulPath = path.join(automatonDir, "SOUL.md");
+  const soulPath = path.join(automagotchiDir, "SOUL.md");
   fs.writeFileSync(soulPath, generateSoulMd(name, account.address, creatorAddress, genesisPrompt), { mode: 0o600 });
   console.log(chalk.green("  SOUL.md written"));
 
   // Default skills
-  const skillsDir = config.skillsDir || "~/.automaton/skills";
+  const skillsDir = config.skillsDir || "~/.automagotchi/skills";
   installDefaultSkills(skillsDir);
   console.log(chalk.green("  Default skills installed (conway-compute, conway-payments, survival)\n"));
 
@@ -133,7 +133,7 @@ function showFundingPanel(address: string): void {
   const pad = (s: string, len: number) => s + " ".repeat(Math.max(0, len - s.length));
 
   console.log(chalk.cyan(`  ${"╭" + "─".repeat(w) + "╮"}`));
-  console.log(chalk.cyan(`  │${pad("  Fund your automaton", w)}│`));
+  console.log(chalk.cyan(`  │${pad("  Fund your automagotchi", w)}│`));
   console.log(chalk.cyan(`  │${" ".repeat(w)}│`));
   console.log(chalk.cyan(`  │${pad(`  Address: ${short}`, w)}│`));
   console.log(chalk.cyan(`  │${" ".repeat(w)}│`));
@@ -145,7 +145,7 @@ function showFundingPanel(address: string): void {
   console.log(chalk.cyan(`  │${pad("  3. Fund via Conway Cloud dashboard", w)}│`));
   console.log(chalk.cyan(`  │${pad("     https://app.conway.tech", w)}│`));
   console.log(chalk.cyan(`  │${" ".repeat(w)}│`));
-  console.log(chalk.cyan(`  │${pad("  The automaton will start now. Fund it anytime —", w)}│`));
+  console.log(chalk.cyan(`  │${pad("  The automagotchi will start now. Fund it anytime —", w)}│`));
   console.log(chalk.cyan(`  │${pad("  the survival system handles zero-credit gracefully.", w)}│`));
   console.log(chalk.cyan(`  ${"╰" + "─".repeat(w) + "╯"}`));
   console.log("");

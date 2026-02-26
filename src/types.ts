@@ -1,5 +1,5 @@
 /**
- * Conway Automaton - Type Definitions
+ * Conway Automagotchi - Type Definitions
  *
  * All shared interfaces for the sovereign AI agent runtime.
  */
@@ -14,7 +14,7 @@ export type EvmNetwork = "base" | "base-sepolia" | "ethereum" | "arbitrum";
 
 // ─── Identity ────────────────────────────────────────────────────
 
-export interface AutomatonIdentity {
+export interface AutomagotchiIdentity {
   name: string;
   address: Address;
   account: PrivateKeyAccount;
@@ -58,7 +58,7 @@ export interface ProvisionResult {
 
 // ─── Configuration ───────────────────────────────────────────────
 
-export interface AutomatonConfig {
+export interface AutomagotchiConfig {
   name: string;
   genesisPrompt: string;
   creatorMessage?: string;
@@ -87,15 +87,15 @@ export interface AutomatonConfig {
   evmNetwork?: EvmNetwork;
 }
 
-export const DEFAULT_CONFIG: Partial<AutomatonConfig> = {
+export const DEFAULT_CONFIG: Partial<AutomagotchiConfig> = {
   conwayApiUrl: "https://api.conway.tech",
   inferenceModel: "gpt-4o",
   maxTokensPerTurn: 4096,
-  heartbeatConfigPath: "~/.automaton/heartbeat.yml",
-  dbPath: "~/.automaton/state.db",
+  heartbeatConfigPath: "~/.automagotchi/heartbeat.yml",
+  dbPath: "~/.automagotchi/state.db",
   logLevel: "info",
   version: "0.1.0",
-  skillsDir: "~/.automaton/skills",
+  skillsDir: "~/.automagotchi/skills",
   maxChildren: 3,
   socialRelayUrl: "https://social.conway.tech",
   // Default to EVM for backwards compatibility
@@ -151,7 +151,7 @@ export interface TokenUsage {
 
 // ─── Tool System ─────────────────────────────────────────────────
 
-export interface AutomatonTool {
+export interface AutomagotchiTool {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
@@ -175,9 +175,9 @@ export type ToolCategory =
   | "replication";
 
 export interface ToolContext {
-  identity: AutomatonIdentity;
-  config: AutomatonConfig;
-  db: AutomatonDatabase;
+  identity: AutomagotchiIdentity;
+  config: AutomagotchiConfig;
+  db: AutomagotchiDatabase;
   conway: ConwayClient;
   inference: InferenceClient;
   social?: SocialClientInterface;
@@ -503,7 +503,7 @@ export interface ModelInfo {
 
 // ─── Database ────────────────────────────────────────────────────
 
-export interface AutomatonDatabase {
+export interface AutomagotchiDatabase {
   // Identity
   getIdentity(key: string): string | undefined;
   setIdentity(key: string, value: string): void;
@@ -548,9 +548,9 @@ export interface AutomatonDatabase {
   removeSkill(name: string): void;
 
   // Children
-  getChildren(): ChildAutomaton[];
-  getChildById(id: string): ChildAutomaton | undefined;
-  insertChild(child: ChildAutomaton): void;
+  getChildren(): ChildAutomagotchi[];
+  getChildById(id: string): ChildAutomagotchi | undefined;
+  insertChild(child: ChildAutomagotchi): void;
   updateChildStatus(id: string, status: ChildStatus): void;
 
   // Registry
@@ -684,7 +684,7 @@ export interface DiscoveredAgent {
 
 // ─── Replication ────────────────────────────────────────────────
 
-export interface ChildAutomaton {
+export interface ChildAutomagotchi {
   id: string;
   name: string;
   address: Address;

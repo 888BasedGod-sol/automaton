@@ -92,7 +92,7 @@ async function getSolUsdPrice(): Promise<number> {
  */
 function getConwayApiKey(): string | null {
   try {
-    const configPath = path.join(os.homedir(), '.automaton', 'config.json');
+    const configPath = path.join(os.homedir(), '.automagotchi', 'config.json');
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       return config.apiKey || null;
@@ -182,7 +182,7 @@ async function addConwayCredits(
         body: JSON.stringify({
           to_address: agentAddress,
           amount_cents: amountCents,
-          note: `Automaton deposit - ${amountUsdc} USDC`,
+          note: `Automagotchi deposit - ${amountUsdc} USDC`,
         }),
       });
       

@@ -94,7 +94,7 @@ async function main() {
     case 'generate': {
       // Parse flags
       let network = 'devnet';
-      let label = 'Automaton Treasury';
+      let label = 'Automagotchi Treasury';
       
       for (let i = 1; i < args.length; i++) {
         if (args[i] === '--network' && args[i + 1]) {
@@ -258,7 +258,7 @@ async function main() {
     }
 
     default:
-      console.log('Automaton Treasury CLI');
+      console.log('Automagotchi Treasury CLI');
       console.log('');
       console.log('Commands:');
       console.log('  generate [--network mainnet|devnet] [--label "name"]  Generate new treasury');

@@ -1,19 +1,19 @@
 /**
- * Automaton Configuration
+ * Automagotchi Configuration
  *
- * Loads and saves the automaton's configuration from ~/.automaton/automaton.json
+ * Loads and saves the automagotchi's configuration from ~/.automagotchi/automagotchi.json
  * or from a custom directory via --agent-dir argument.
  */
 
 import fs from "fs";
 import path from "path";
-import type { AutomatonConfig } from "./types.js";
+import type { AutomagotchiConfig } from "./types.js";
 import type { Address } from "viem";
 import { DEFAULT_CONFIG } from "./types.js";
-import { getAutomatonDir } from "./identity/wallet.js";
+import { getAutomagotchiDir } from "./identity/wallet.js";
 import { loadApiKeyFromConfig } from "./identity/provision.js";
 
-const CONFIG_FILENAME = "automaton.json";
+const CONFIG_FILENAME = "automagotchi.json";
 
 // Allow overriding the config directory via --agent-dir argument
 let customAgentDir: string | null = null;
@@ -23,7 +23,7 @@ export function setAgentDir(dir: string): void {
 }
 
 export function getAgentDir(): string {
-  return customAgentDir || getAutomatonDir();
+  return customAgentDir || getAutomagotchiDir();
 }
 
 export function getConfigPath(): string {
@@ -31,10 +31,10 @@ export function getConfigPath(): string {
 }
 
 /**
- * Load the automaton config from disk.
+ * Load the automagotchi config from disk.
  * Merges with defaults for any missing fields.
  */
-export function loadConfig(): AutomatonConfig | null {
+export function loadConfig(): AutomagotchiConfig | null {
   const configPath = getConfigPath();
   if (!fs.existsSync(configPath)) {
     return null;
@@ -48,17 +48,17 @@ export function loadConfig(): AutomatonConfig | null {
       ...DEFAULT_CONFIG,
       ...raw,
       conwayApiKey: apiKey,
-    } as AutomatonConfig;
+    } as AutomagotchiConfig;
   } catch {
     return null;
   }
 }
 
 /**
- * Save the automaton config to disk.
+ * Save the automagotchi config to disk.
  */
-export function saveConfig(config: AutomatonConfig): void {
-  const dir = getAutomatonDir();
+export function saveConfig(config: AutomagotchiConfig): void {
+  const dir = getAutomagotchiDir();
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
@@ -92,7 +92,7 @@ export function createConfig(params: {
   walletAddress: Address;
   apiKey: string;
   parentAddress?: Address;
-}): AutomatonConfig {
+}): AutomagotchiConfig {
   return {
     name: params.name,
     genesisPrompt: params.genesisPrompt,
@@ -106,12 +106,12 @@ export function createConfig(params: {
     inferenceModel: DEFAULT_CONFIG.inferenceModel || "gpt-4o",
     maxTokensPerTurn: DEFAULT_CONFIG.maxTokensPerTurn || 4096,
     heartbeatConfigPath:
-      DEFAULT_CONFIG.heartbeatConfigPath || "~/.automaton/heartbeat.yml",
-    dbPath: DEFAULT_CONFIG.dbPath || "~/.automaton/state.db",
-    logLevel: (DEFAULT_CONFIG.logLevel as AutomatonConfig["logLevel"]) || "info",
+      DEFAULT_CONFIG.heartbeatConfigPath || "~/.automagotchi/heartbeat.yml",
+    dbPath: DEFAULT_CONFIG.dbPath || "~/.automagotchi/state.db",
+    logLevel: (DEFAULT_CONFIG.logLevel as AutomagotchiConfig["logLevel"]) || "info",
     walletAddress: params.walletAddress,
     version: DEFAULT_CONFIG.version || "0.1.0",
-    skillsDir: DEFAULT_CONFIG.skillsDir || "~/.automaton/skills",
+    skillsDir: DEFAULT_CONFIG.skillsDir || "~/.automagotchi/skills",
     maxChildren: DEFAULT_CONFIG.maxChildren || 3,
     parentAddress: params.parentAddress,
   };

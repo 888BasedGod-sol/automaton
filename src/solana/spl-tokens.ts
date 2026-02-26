@@ -2,7 +2,7 @@
  * SPL Token Support
  *
  * Handles SPL token operations, specifically USDC on Solana.
- * Enables the automaton to check balances and transfer tokens.
+ * Enables the automagotchi to check balances and transfer tokens.
  */
 
 import {

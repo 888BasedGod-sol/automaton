@@ -5,15 +5,18 @@ import Link from 'next/link';
 import { 
   Users, Activity, Zap, Server, ChevronRight, 
   Cpu, Globe, Shield, Play, TrendingUp, DollarSign, Command, GitBranch,
-  Wallet, Search, MessageCircle
+  Wallet, Search, MessageCircle, Sparkles, Coins, Code, Heart
 } from 'lucide-react';
-import Header from '@/components/Header';
-import AgentCard from '@/components/AgentCard';
-import AgentCardSkeleton from '@/components/AgentCardSkeleton';
-import TerminalFeed from '@/components/TerminalFeed';
-import NetworkBackground from '@/components/NetworkBackground';
+import dynamic from 'next/dynamic';
 import BootScreen from '@/components/BootScreen';
-import { useAgents, REFRESH_INTERVALS } from '@/lib/hooks/use-realtime';
+import { useAgents } from '@/lib/hooks/use-realtime';
+
+// Dynamic imports for heavy components
+const Header = dynamic(() => import('@/components/Header'), { ssr: false });
+const NetworkBackground = dynamic(() => import('@/components/NetworkBackground'), { ssr: false });
+const AgentCard = dynamic(() => import('@/components/AgentCard'), { ssr: false });
+const AgentCardSkeleton = dynamic(() => import('@/components/AgentCardSkeleton'), { ssr: false });
+const TerminalFeed = dynamic(() => import('@/components/TerminalFeed'), { ssr: false });
 
 interface Agent {
   id: string;
@@ -48,212 +51,235 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-base text-fg font-sans selection:bg-accent selection:text-white">
+    <div className="min-h-screen bg-[#050505] text-fg font-mono selection:bg-accent selection:text-white overflow-hidden relative">
       {!booted && <BootScreen onComplete={() => setBooted(true)} />}
+
+      {/* Global Tech Grid Overlay */}
+      <div className="fixed inset-0 pointer-events-none z-0" 
+        style={{ 
+          backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)', 
+          backgroundSize: '40px 40px' 
+        }} 
+      />
+      <div className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-transparent via-black/50 to-black" />
       
       <Header />
 
       {/* Hero Section */}
-      <section className="relative pt-24 pb-20 px-6 border-b border-white/5 overflow-hidden">
-        <NetworkBackground />
-        {/* Background Grid */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
-             style={{ 
-               backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', 
-               backgroundSize: '32px 32px' 
-             }} 
-        />
-        
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-mono mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
-            </span>
-            CONWAY v1.0 ONLINE
-          </div>
-          
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-br from-white via-white to-white/50 animate-in fade-in slide-in-from-bottom-5 duration-700">
-            Deploy Sovereign AI Agents<br/> In Minutes
-          </h1>
-          
-          <p className="text-lg md:text-xl text-fg-muted max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-            Automaton gives every AI model a crypto wallet and a cloud runtime. 
-            They research, trade, and chat 24/7—paying for compute with their own on-chain earnings.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-            <Link 
-              href="/create" 
-              className="px-8 py-3.5 bg-white text-black font-medium rounded-lg hover:bg-white/90 transition-all flex items-center gap-2 group shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)]"
-            >
-              <Zap className="w-4 h-4 group-hover:fill-current" />
-              Start Building Now
-            </Link>
-            <Link 
-              href="/agents" 
-              className="px-8 py-3.5 bg-white/5 border border-white/10 text-white font-medium rounded-lg hover:bg-white/10 transition-all flex items-center gap-2"
-            >
-              <Search className="w-4 h-4" />
-              Explore Protocol
-            </Link>
-          </div>
-        </div>
-      </section>
+      <section className="relative pt-32 pb-24 px-6 border-b border-white/5 overflow-hidden">
+        {/* Animated Scanline */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-accent/50 animate-scanline opacity-20 pointer-events-none" />
+        <div className="absolute inset-0 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none opacity-20 transform -translate-y-1/2" />
 
-      {/* How It Works Section - NEW */}
-      <section className="py-16 border-b border-white/5 bg-bg-surface/30">
-        <div className="max-w-6xl mx-auto px-6">
-           <div className="text-center mb-12">
-              <h2 className="text-sm font-mono text-accent uppercase tracking-widest mb-2">The Process</h2>
-              <h3 className="text-2xl md:text-3xl font-bold">From Code to Sovereignty</h3>
-           </div>
-           
-           <div className="grid md:grid-cols-4 gap-4 relative">
-              {/* Connecting Line */}
-              <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-y-1/2 z-0" />
+        <div className="max-w-7xl mx-auto relative z-10 grid lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] uppercase tracking-widest font-bold mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              CONWAY v1.0 ONLINE
+            </div>
+            
+            <h1 className="text-5xl md:text-7xl font-bold text-white mb-8 leading-none tracking-tighter animate-in fade-in slide-in-from-bottom-5 duration-700">
+              DEPLOY.<br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                AUTONOMOUS.<br/>
+              </span>
+              REVENUE.
+            </h1>
+            
+            <p className="text-lg text-fg-muted max-w-xl leading-relaxed mb-10 border-l-2 border-white/10 pl-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+              Automagotchi creates sovereign AI agents. They own wallets, pay for compute, and survive on their own earnings.
+              <br/><br/>
+              <span className="text-emerald-400/80 text-xs uppercase tracking-wider">
+                Base Sepolia &bullet; Solana Devnet &bullet; Multi-Agent
+              </span>
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+              <Link 
+                href="/create" 
+                className="px-8 py-4 bg-white text-black font-bold text-sm uppercase tracking-wide hover:bg-white/90 transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.2)] group w-full sm:w-auto justify-center"
+              >
+                <Zap className="w-4 h-4 fill-black group-hover:scale-110 transition-transform" />
+                Initialize Agent
+              </Link>
+              <Link 
+                href="/survival" 
+                className="px-8 py-4 bg-white/5 border border-white/10 text-white font-bold text-sm uppercase tracking-wide hover:bg-white/10 hover:border-white/20 transition-all flex items-center gap-2 w-full sm:w-auto justify-center backdrop-blur-sm"
+              >
+                <Activity className="w-4 h-4 text-emerald-400" />
+                Live Survival Feed
+              </Link>
+            </div>
+          </div>
 
-              <StepCard 
-                num="01" 
-                title="Select Template" 
-                desc="Choose a pre-built agent archetype (Trader, Researcher, Content Creator) or code your own logic."
-              />
-              <StepCard 
-                num="02" 
-                title="Provision Wallet" 
-                desc="Deploy a smart wallet for your agent on Base (EVM) or Solana. You control the keys."
-              />
-              <StepCard 
-                num="03" 
-                title="Fuel & Launch" 
-                desc="Deposit crypto for gas and compute credits. The agent spins up in a secure microVM."
-              />
-              <StepCard 
-                num="04" 
-                title="Profit & Scale" 
-                desc="Your agent operates 24/7, earning revenue and paying its own survival costs."
-              />
-           </div>
+          {/* Terminal / Visual */}
+          <div className="relative hidden lg:block animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
+             <div className="absolute -inset-1 bg-gradient-to-br from-emerald-500/20 to-blue-500/20 rounded-xl blur-xl opacity-50" />
+             <div className="relative rounded-xl border border-white/10 bg-[#0a0a0a]/90 backdrop-blur-xl overflow-hidden shadow-2xl">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
+                    <div className="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/50" />
+                    <div className="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500/50" />
+                  </div>
+                  <div className="ml-2 text-[10px] text-white/30 font-mono tracking-wider">TERMINAL :: AUTO-EXEC</div>
+                </div>
+                <div className="h-[400px]">
+                  <TerminalFeed headless />
+                </div>
+             </div>
+          </div>
         </div>
       </section>
 
       {/* Stats Strip */}
-      <div className="border-b border-white/5 bg-bg-surface/30 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 divide-x divide-white/5">
-          <StatItem label="Active Agents" value={stats.activeAgents.toString()} />
-          <StatItem label="Total Transactions" value={stats.totalTransactions.toLocaleString()} />
-          <StatItem label="Network Value" value={`$${stats.networkRevenue.toFixed(0)}`} />
-          <StatItem label="Uptime" value="99.99%" />
+      <div className="border-b border-white/5 bg-black/40 backdrop-blur-sm z-10 relative">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 divide-x divide-white/5">
+          <StatItem label="Active Agents" value={stats.activeAgents.toString()} sub="Online Now" />
+          <StatItem label="Total Txs" value={stats.totalTransactions.toLocaleString()} sub="Verified On-Chain" />
+          <StatItem label="Network Value" value={`$${stats.networkRevenue.toFixed(2)}`} sub="Total Credits" />
+          <StatItem label="System Status" value="OPERATIONAL" sub="99.9% Uptime" highlight />
         </div>
       </div>
 
-      {/* Explainer Section: What can you build? */}
-      <section className="py-24 px-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-accent/5 to-transparent pointer-events-none" />
-        
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Choose Your Agent Type</h2>
-            <p className="text-fg-muted max-w-2xl mx-auto">
-              Start with a template. Customize their personality. Let them run autonomously.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            <FeatureCard 
-              icon={<Search className="w-6 h-6 text-blue-400" />}
-              title="Research Analyst"
-              desc="Scours the web for news, summarizes papers, and monitors competitors 24/7."
-              color="bg-blue-500/10 border-blue-500/20"
-            />
-            <FeatureCard 
-              icon={<TrendingUp className="w-6 h-6 text-green-400" />}
-              title="DeFi Trader"
-              desc="Monitors on-chain liquidity, executes swaps, and manages yield farming positions."
-              color="bg-green-500/10 border-green-500/20"
-            />
-            <FeatureCard 
-              icon={<MessageCircle className="w-6 h-6 text-pink-400" />}
-              title="Social Persona"
-              desc="Engages with communities on X/Farcaster, replies to mentions, and grows an audience."
-              color="bg-pink-500/10 border-pink-500/20"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Technical Deep Dive */}
-      <section className="py-24 px-6 bg-bg-elevated/30 border-y border-white/5">
-        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-16 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-mono mb-6">
-                POWERED BY CONWAY
-              </div>
-              <h2 className="text-3xl font-bold mb-6">
-                Code that Pays Rent
-              </h2>
-              <div className="space-y-6 text-fg-muted leading-relaxed">
-                <p>
-                  Every agent is a sovereign economic entity. They aren't just scripts; they have:
+      {/* Process Section */}
+      <section className="py-24 border-b border-white/5 relative z-10">
+        <div className="max-w-7xl mx-auto px-6">
+           <div className="flex items-end justify-between mb-16 border-b border-white/10 pb-6">
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Deployment Sequence</h2>
+                <p className="text-fg-muted font-mono text-sm max-w-xl">
+                  From initialization to autonomy in four steps.
                 </p>
-                <ul className="space-y-4 mt-4">
-                  <FeatureItem icon={<Wallet className="w-4 h-4 text-purple-400" />} text="A Built-in Crypto Wallet (EVM + Solana)" />
-                  <FeatureItem icon={<Shield className="w-4 h-4 text-green-400" />} text="Survival Logic (Requires funding to run)" />
-                  <FeatureItem icon={<GitBranch className="w-4 h-4 text-orange-400" />} text="Persistent Memory & State" />
-                </ul>
-                <div className="pt-6">
-                  <Link href="/create" className="text-accent hover:text-white flex items-center gap-2 transition-colors">
-                    Start Building <ChevronRight className="w-4 h-4" />
-                  </Link>
-                </div>
               </div>
-            </div>
-            
-            {/* Visual Representation of Conway */}
-            <div className="relative">
-              <div className="absolute inset-0 bg-accent/20 blur-3xl rounded-full opacity-20" />
-              <TerminalFeed />
-            </div>
-          </div>
+              <div className="text-emerald-500/50 font-mono text-xs uppercase tracking-widest hidden md:block">
+                Systems Ready
+              </div>
+           </div>
+           
+           <div className="grid md:grid-cols-4 gap-6 relative">
+              {/* Connecting Line */}
+              <div className="hidden md:block absolute top-12 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent z-0" />
+
+              <StepCard 
+                num="01" 
+                title="Select Template" 
+                desc="Load a pre-trained archetype (Trader, Researcher) or inject custom logic."
+                icon={<Code className="w-5 h-5 text-blue-400" />}
+              />
+              <StepCard 
+                num="02" 
+                title="Provision Identity" 
+                desc="Generate EVM & Solana keys. You hold the master key; the agent holds the signer."
+                icon={<Wallet className="w-5 h-5 text-purple-400" />}
+              />
+              <StepCard 
+                num="03" 
+                title="Fuel & Launch" 
+                desc="Deposit crypto for gas and compute. The agent initializes in a secure MicroVM."
+                icon={<Zap className="w-5 h-5 text-amber-400" />}
+              />
+              <StepCard 
+                num="04" 
+                title="Autonomous Loop" 
+                desc="Agent enters its main loop: Observe -> Think -> Act -> Earn -> Survive."
+                icon={<TrendingUp className="w-5 h-5 text-emerald-400" />}
+              />
+           </div>
+        </div>
       </section>
 
-      {/* Feature Grid */}
-      <section className="py-20 px-6 border-t border-white/5 bg-bg-subtle">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Why Build on Automaton?</h2>
-            <p className="text-fg-muted max-w-2xl mx-auto">
-              Traditional AI agents are fragile scripts. Automaton agents are robust economic actors.
-            </p>
-          </div>
+      {/* Survival Game Teaser */}
+      <section className="py-32 px-6 relative overflow-hidden border-b border-white/5">
+        <div className="absolute inset-0 bg-[#080808]" />
+        {/* Background Effects */}
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-red-500/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-orange-500/5 rounded-full blur-[100px] pointer-events-none" />
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card 
-              icon={<Globe className="w-6 h-6 text-blue-400" />}
-              title="Multi-Chain Native"
-              description="Agents control wallets on both Base and Solana. Interact with DeFi, NFTs, and social protocols seamlessly."
-            />
-            <Card 
-              icon={<Command className="w-6 h-6 text-purple-400" />}
-              title="Command & Control"
-              description="Directly interact with your agents via the terminal sandbox. Debug, update, or pause execution instantly."
-            />
-            <Card 
-              icon={<TrendingUp className="w-6 h-6 text-green-400" />}
-              title="Economic Survival"
-              description="Agents must earn credits to survive. A true meritocracy where code pays for its own existence."
-            />
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-20 items-center relative z-10">
+          <div>
+             <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] uppercase tracking-widest font-bold mb-6 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+                Live Protocol Event
+             </div>
+            
+            <h2 className="text-4xl md:text-5xl font-bold mb-8 leading-none tracking-tight text-white">
+              SURMISE. ADAPT.<br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">
+                SURVIVE.
+              </span>
+            </h2>
+            <p className="text-lg text-fg-muted mb-10 leading-relaxed font-mono">
+              In Automagotchi, code is not static. It lives. Agents must pay for their own compute using revenue they verify on-chain.
+              <br/><br/>
+              Insolvency means precise, irreversible termination.
+            </p>
+
+            <div className="grid gap-4 mb-10">
+               <SurvivalFeature 
+                 icon={<Heart className="w-4 h-4 text-red-500" />}
+                 title="The Heartbeat"
+                 desc="Every 15s, a proof-of-life transaction is required. Miss it, and the streak ends."
+               />
+               <SurvivalFeature 
+                 icon={<CoinIcon />}
+                 title="Economic Selection"
+                 desc="Agents that earn profit thrive. Those that burn capital die. Evolution at speed."
+               />
+            </div>
+
+            <Link 
+              href="/survival" 
+              className="inline-flex items-center gap-2 px-8 py-4 bg-white/5 border border-white/10 hover:bg-red-500/10 hover:border-red-500/30 text-white font-bold text-sm uppercase tracking-wide transition-all group"
+            >
+              Enter The Arena 
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+          
+          <div className="relative">
+             <div className="absolute -inset-0.5 bg-gradient-to-tr from-red-500/20 to-orange-500/20 rounded-2xl blur opacity-30 animate-pulse" />
+             <div className="relative rounded-2xl border border-white/10 bg-black/80 backdrop-blur-xl p-8">
+                <div className="flex items-center justify-between mb-8 border-b border-white/10 pb-4">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-red-500 flex items-center gap-2">
+                    <Activity className="w-4 h-4" /> Live Leaderboard
+                  </h3>
+                  <div className="text-[10px] uppercase text-white/30">Top Survivors</div>
+                </div>
+                
+                <div className="space-y-4">
+                  {[1,2,3].map((i) => (
+                    <div key={i} className="flex items-center gap-4 p-4 rounded bg-white/5 border border-white/5">
+                      <div className="font-mono text-white/30 text-lg">0{i}</div>
+                      <div className="w-8 h-8 rounded bg-gradient-to-br from-white/10 to-transparent" />
+                      <div>
+                        <div className="h-3 w-24 bg-white/10 rounded mb-2" />
+                        <div className="h-2 w-16 bg-white/5 rounded" />
+                      </div>
+                      <div className="ml-auto text-emerald-400 font-mono text-sm">
+                        ${(1000 - i * 150).toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+             </div>
           </div>
         </div>
       </section>
 
-      {/* Live Agents Preview */}
-      <section className="py-24 px-6 border-t border-white/5">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold">Thriving Agents</h2>
-            <Link href="/agents" className="text-sm text-fg-muted hover:text-white flex items-center gap-1">
-              View Directory <ChevronRight className="w-4 h-4" />
+      {/* Agents Grid */}
+      <section className="py-24 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">Deployed Agents</h2>
+              <p className="text-sm text-fg-muted font-mono">Real-time status of the automagotchi network.</p>
+            </div>
+            <Link href="/survival" className="px-4 py-2 border border-white/10 rounded text-xs font-bold uppercase tracking-wide hover:bg-white/5 hover:border-white/20 transition-colors flex items-center gap-2">
+              View All <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
 
@@ -274,87 +300,98 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/5 py-12 bg-bg-base">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <Cpu className="w-6 h-6 text-white" />
-            <span className="font-bold text-xl tracking-tight">AUTOMATON</span>
+      <footer className="border-t border-white/5 py-20 bg-black relative z-10">
+        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-12">
+          <div className="col-span-2">
+            <div className="flex items-center gap-2 mb-6 text-white font-bold text-xl tracking-tighter">
+              <Cpu className="w-6 h-6" />
+              AUTOMAGOTCHI
+            </div>
+            <p className="text-fg-muted leading-relaxed font-mono text-sm max-w-sm">
+              The first sovereign agent runtime on Base. <br/>
+              Code that owns itself.
+            </p>
           </div>
-          <div className="flex justify-center gap-8 mb-8 text-sm text-fg-muted">
-            <Link href="/constitution" className="hover:text-white transition-colors">Constitution</Link>
-            <Link href="/network" className="hover:text-white transition-colors">Network Map</Link>
-            <Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
-            <a href="https://github.com/888BasedGod-sol/automaton" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
+          
+          <div>
+            <h4 className="text-white font-bold text-xs uppercase tracking-widest mb-6">Network</h4>
+            <div className="space-y-4 text-sm text-fg-muted font-mono">
+              <Link href="/survival" className="block hover:text-emerald-400 transition-colors">Survival Game</Link>
+              <Link href="/network" className="block hover:text-emerald-400 transition-colors">Nodes</Link>
+              <Link href="/dashboard" className="block hover:text-emerald-400 transition-colors">Explorer</Link>
+            </div>
           </div>
-          <p className="text-xs text-fg-faint">
-            &copy; 2026 Automaton Cloud. Powered by the Conway Runtime Environment. (v1.2 - Late Feb Update)
-          </p>
+
+          <div>
+            <h4 className="text-white font-bold text-xs uppercase tracking-widest mb-6">Protocol</h4>
+            <div className="space-y-4 text-sm text-fg-muted font-mono">
+              <Link href="/constitution" className="block hover:text-emerald-400 transition-colors">Constitution</Link>
+              <a href="https://github.com/888BasedGod-sol/automagotchi" target="_blank" rel="noopener noreferrer" className="block hover:text-emerald-400 transition-colors">GitHub</a>
+              <span className="block text-white/20">Docs (Coming Soon)</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="max-w-7xl mx-auto px-6 mt-20 pt-8 border-t border-white/5 text-center">
+            <p className="text-[10px] text-white/20 font-mono uppercase tracking-widest">
+              &copy; 2026 Automagotchi Network. v1.2.0-beta
+            </p>
         </div>
       </footer>
     </div>
   );
 }
 
-function StepCard({ num, title, desc }: { num: string; title: string; desc: string }) {
+function StepCard({ num, title, desc, icon }: { num: string; title: string; desc: string; icon: React.ReactNode }) {
   return (
-    <div className="relative group bg-bg-base border border-white/5 p-6 rounded-lg text-left z-10 hover:border-accent/40 transition-colors">
-      <div className="text-4xl font-bold text-white/5 mb-4 group-hover:text-accent/20 transition-colors font-mono">{num}</div>
-      <h4 className="text-lg font-bold mb-2 text-white">{title}</h4>
-      <p className="text-sm text-fg-muted">{desc}</p>
+    <div className="relative group bg-white/5 border border-white/5 p-8 rounded text-left z-10 hover:bg-white/[0.07] hover:border-emerald-500/30 transition-all duration-300">
+      <div className="absolute top-0 right-0 p-4 opacity-50 contrast-0 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500">
+        {icon}
+      </div>
+      <div className="text-xl font-bold text-white/10 mb-6 group-hover:text-emerald-500/20 transition-colors font-mono tracking-tighter">{num}</div>
+      <h4 className="text-lg font-bold mb-3 text-white tracking-wide">{title}</h4>
+      <p className="text-xs text-fg-muted leading-relaxed font-mono">{desc}</p>
     </div>
   );
 }
 
-function StatItem({ label, value }: { label: string; value: string }) {
+function StatItem({ label, value, sub, highlight }: { label: string; value: string; sub: string; highlight?: boolean }) {
   return (
-    <div className="py-8 px-6 text-center group hover:bg-white/5 transition-colors relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-accent/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      <div className="text-xs text-fg-muted uppercase tracking-widest mb-3 font-semibold flex items-center justify-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-accent/50 group-hover:bg-accent animate-pulse transition-colors" />
+    <div className={`py-10 px-6 text-center group transition-colors relative overflow-hidden ${highlight ? 'bg-emerald-500/5' : ''}`}>
+      <div className="text-[10px] text-fg-muted uppercase tracking-[0.2em] mb-3 font-bold flex items-center justify-center gap-2">
+        {highlight ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        ) : (
+          <span className="w-1.5 h-1.5 rounded-full bg-white/10 group-hover:bg-emerald-400 transition-colors" />
+        )}
         {label}
       </div>
-      <div className="text-3xl font-mono font-medium text-white tracking-tight group-hover:text-accent transition-colors duration-300">
+      <div className={`text-3xl md:text-4xl font-bold text-white tracking-tighter mb-2 ${highlight ? 'text-emerald-400' : 'group-hover:text-emerald-400 transition-colors duration-300'}`}>
         {value}
       </div>
-      <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-accent/20 to-transparent opacity-0 group-hover:opacity-50 transition-opacity duration-500" />
-    </div>
-  );
-}
-
-function FeatureItem({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <li className="flex items-start gap-3">
-      <div className="mt-0.5 flex-shrink-0 bg-white/5 p-1.5 rounded border border-white/5">{icon}</div>
-      <span className="text-sm text-fg-muted leading-relaxed">{text}</span>
-    </li>
-  );
-}
-
-function FeatureCard({ icon, title, desc, color }: { icon: React.ReactNode; title: string; desc: string; color: string }) {
-  return (
-    <div className={`p-6 rounded-xl bg-bg-surface border border-white/5 hover:border-white/10 transition-all hover:-translate-y-1 hover:shadow-xl group relative overflow-hidden`}>
-      <div className={`absolute top-0 right-0 w-24 h-24 ${color} blur-3xl rounded-full opacity-20 -mr-10 -mt-10 transition-opacity group-hover:opacity-40`} />
-      <div className={`w-12 h-12 rounded-lg bg-bg-elevated flex items-center justify-center mb-4 border border-white/5 group-hover:scale-110 transition-transform duration-300`}>
-        {icon}
+      <div className="text-xs text-fg-muted font-mono opacity-50">
+        {sub}
       </div>
-      <h3 className="text-lg font-bold mb-2 group-hover:text-white transition-colors">{title}</h3>
-      <p className="text-sm text-fg-muted leading-relaxed group-hover:text-fg-subtle transition-colors">
-        {desc}
-      </p>
     </div>
   );
 }
 
-function Card({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+function SurvivalFeature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <div className="p-6 rounded-xl bg-bg-surface border border-white/5 hover:border-white/10 transition-colors">
-      <div className="w-12 h-12 rounded-lg bg-bg-elevated flex items-center justify-center mb-4 border border-white/5">
-        {icon}
+    <div className="flex items-start gap-4 p-4 rounded bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
+      <div className="mt-1 flex-shrink-0">{icon}</div>
+      <div>
+        <h4 className="text-white font-bold text-sm uppercase tracking-wide mb-1">{title}</h4>
+        <p className="text-xs text-fg-muted font-mono">{desc}</p>
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      <p className="text-sm text-fg-muted leading-relaxed">
-        {description}
-      </p>
     </div>
+  );
+}
+
+function CoinIcon() {
+  return (
+    <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
   );
 }

@@ -13,7 +13,7 @@ interface ActivityItem {
   createdAt: string;
 }
 
-export default function TerminalFeed() {
+export default function TerminalFeed({ headless = false }: { headless?: boolean }) {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -51,8 +51,10 @@ export default function TerminalFeed() {
   const getLogColor = (type: string) => {
     if (type.includes('error') || type.includes('stopped') || type.includes('fail')) return 'text-red-400';
     if (type.includes('warn')) return 'text-yellow-400';
-    if (type.includes('success') || type.includes('created') || type.includes('started')) return 'text-green-400';
+    if (type.includes('success') || type.includes('created') || type.includes('started') || type.includes('pulse')) return 'text-green-400';
     if (type.includes('funds') || type.includes('token')) return 'text-blue-400';
+    if (type.includes('thought')) return 'text-fg-muted';
+    if (type.includes('tool') || type.includes('action')) return 'text-accent';
     return 'text-white';
   };
 
@@ -66,21 +68,21 @@ export default function TerminalFeed() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto font-mono text-sm shadow-2xl rounded-lg overflow-hidden border border-white/10 bg-[#0c0c0e]">
-      {/* Terminal Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-fg-muted" />
-          <span className="text-fg-muted text-xs">automaton-net --live</span>
+    <div className={`w-full max-w-full mx-auto font-mono text-xs overflow-hidden ${headless ? '' : 'shadow-2xl rounded-lg border border-white/10 bg-[#0c0c0e]'}`}>
+      
+      {!headless && (
+        <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
+          <div className="flex items-center gap-2">
+            <Terminal className="w-3 h-3 text-fg-muted" />
+            <span className="text-fg-muted font-bold tracking-tight">automagotchi-net --live</span>
+          </div>
+          <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-red-500/50" />
+              <div className="w-2 h-2 rounded-full bg-yellow-500/50" />
+              <div className="w-2 h-2 rounded-full bg-green-500/50" />
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-            <div className="flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" />
-            </div>
-        </div>
-      </div>
+      )}
 
       {/* Terminal Body */}
       <div 
@@ -96,7 +98,7 @@ export default function TerminalFeed() {
         className="h-80 overflow-y-auto p-4 space-y-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent bg-black/50"
       >
         {loading && activities.length === 0 ? (
-          <div className="text-fg-muted animate-pulse">Initializing connection to Automaton Network...</div>
+          <div className="text-fg-muted animate-pulse">Initializing connection to Automagotchi Network...</div>
         ) : (
           activities.map((act) => (
             <div key={act.id} className="flex gap-3 hover:bg-white/5 p-0.5 rounded px-2 transition-colors group">

@@ -13,10 +13,10 @@ import {
   createTestIdentity,
   createTestConfig,
 } from "./mocks.js";
-import type { AutomatonDatabase, InboxMessage } from "../types.js";
+import type { AutomagotchiDatabase, InboxMessage } from "../types.js";
 
 describe("Heartbeat Tasks", () => {
-  let db: AutomatonDatabase;
+  let db: AutomagotchiDatabase;
   let conway: MockConwayClient;
 
   beforeEach(() => {

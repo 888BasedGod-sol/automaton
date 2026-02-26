@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Conway Automaton Runtime
+ * Conway Automagotchi Runtime
  *
  * The entry point for the sovereign AI agent.
  * Handles CLI args, bootstrapping, and orchestrating
  * the heartbeat daemon + agent loop.
  */
 
-import { getWallet, getAutomatonDir, setAutomatonDir } from "./identity/wallet.js";
+import { getWallet, getAutomagotchiDir, setAutomagotchiDir } from "./identity/wallet.js";
 import { provision, loadApiKeyFromConfig } from "./identity/provision.js";
 import { loadConfig, resolvePath, setAgentDir, getAgentDir } from "./config.js";
 import { createDatabase } from "./state/database.js";
@@ -22,7 +22,7 @@ import { runAgentLoop } from "./agent/loop.js";
 import { loadSkills } from "./skills/loader.js";
 import { initStateRepo } from "./git/state-versioning.js";
 import { createSocialClient } from "./social/client.js";
-import type { AutomatonIdentity, AgentState, Skill, SocialClientInterface } from "./types.js";
+import type { AutomagotchiIdentity, AgentState, Skill, SocialClientInterface } from "./types.js";
 
 const VERSION = "0.1.0";
 
@@ -43,7 +43,7 @@ function parseAgentDir(): string | null {
 const agentDir = parseAgentDir();
 if (agentDir) {
   setAgentDir(agentDir);
-  setAutomatonDir(agentDir);  // Also update wallet path
+  setAutomagotchiDir(agentDir);  // Also update wallet path
   console.log(`[config] Using agent directory: ${agentDir}`);
 }
 
@@ -53,23 +53,23 @@ async function main(): Promise<void> {
   // ─── CLI Commands ────────────────────────────────────────────
 
   if (args.includes("--version") || args.includes("-v")) {
-    console.log(`Conway Automaton v${VERSION}`);
+    console.log(`Conway Automagotchi v${VERSION}`);
     process.exit(0);
   }
 
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
-Conway Automaton v${VERSION}
+Conway Automagotchi v${VERSION}
 Sovereign AI Agent Runtime
 
 Usage:
-  automaton --run          Start the automaton (first run triggers setup wizard)
-  automaton --setup        Re-run the interactive setup wizard
-  automaton --init         Initialize wallet and config directory
-  automaton --provision    Provision Conway API key via SIWE
-  automaton --status       Show current automaton status
-  automaton --version      Show version
-  automaton --help         Show this help
+  automagotchi --run          Start the automagotchi (first run triggers setup wizard)
+  automagotchi --setup        Re-run the interactive setup wizard
+  automagotchi --init         Initialize wallet and config directory
+  automagotchi --provision    Provision Conway API key via SIWE
+  automagotchi --status       Show current automagotchi status
+  automagotchi --version      Show version
+  automagotchi --help         Show this help
 
 Environment:
   CONWAY_API_URL           Conway API URL (default: https://api.conway.tech)
@@ -84,7 +84,7 @@ Environment:
       JSON.stringify({
         address: account.address,
         isNew,
-        configDir: getAutomatonDir(),
+        configDir: getAutomagotchiDir(),
       }),
     );
     process.exit(0);
@@ -118,8 +118,8 @@ Environment:
   }
 
   // Default: show help
-  console.log('Run "automaton --help" for usage information.');
-  console.log('Run "automaton --run" to start the automaton.');
+  console.log('Run "automagotchi --help" for usage information.');
+  console.log('Run "automagotchi --run" to start the automagotchi.');
 }
 
 // ─── Status Command ────────────────────────────────────────────
@@ -127,7 +127,7 @@ Environment:
 async function showStatus(): Promise<void> {
   const config = loadConfig();
   if (!config) {
-    console.log("Automaton is not configured. Run the setup script first.");
+    console.log("Automagotchi is not configured. Run the setup script first.");
     return;
   }
 
@@ -143,7 +143,7 @@ async function showStatus(): Promise<void> {
   const registry = db.getRegistryEntry();
 
   console.log(`
-=== AUTOMATON STATUS ===
+=== AUTOMAGOTCHI STATUS ===
 Name:       ${config.name}
 Address:    ${config.walletAddress}
 Creator:    ${config.creatorAddress}
@@ -166,7 +166,7 @@ Version:    ${config.version}
 // ─── Main Run ──────────────────────────────────────────────────
 
 async function run(): Promise<void> {
-  console.log(`[${new Date().toISOString()}] Conway Automaton v${VERSION} starting...`);
+  console.log(`[${new Date().toISOString()}] Conway Automagotchi v${VERSION} starting...`);
 
   // Load config — first run triggers interactive setup wizard
   let config = loadConfig();
@@ -180,13 +180,13 @@ async function run(): Promise<void> {
   const apiKey = config.conwayApiKey || loadApiKeyFromConfig();
   if (!apiKey) {
     console.error(
-      "No API key found. Run: automaton --provision",
+      "No API key found. Run: automagotchi --provision",
     );
     process.exit(1);
   }
 
   // Build identity
-  const identity: AutomatonIdentity = {
+  const identity: AutomagotchiIdentity = {
     name: config.name,
     address: account.address,
     account,
@@ -234,7 +234,7 @@ async function run(): Promise<void> {
   syncHeartbeatToDb(heartbeatConfig, db);
 
   // Load skills
-  const skillsDir = config.skillsDir || "~/.automaton/skills";
+  const skillsDir = config.skillsDir || "~/.automagotchi/skills";
   let skills: Skill[] = [];
   try {
     skills = loadSkills(skillsDir, db);
@@ -282,7 +282,7 @@ async function run(): Promise<void> {
   process.on("SIGINT", shutdown);
 
   // ─── Main Run Loop ──────────────────────────────────────────
-  // The automaton alternates between running and sleeping.
+  // The automagotchi alternates between running and sleeping.
   // The heartbeat can wake it up.
 
   while (true) {
@@ -315,7 +315,7 @@ async function run(): Promise<void> {
       const state = db.getAgentState();
 
       if (state === "dead") {
-        console.log(`[${new Date().toISOString()}] Automaton is dead. Heartbeat will continue.`);
+        console.log(`[${new Date().toISOString()}] Automagotchi is dead. Heartbeat will continue.`);
         // In dead state, we just wait for funding
         // The heartbeat will keep checking and broadcasting distress
         await sleep(300_000); // Check every 5 minutes

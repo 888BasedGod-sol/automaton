@@ -16,10 +16,10 @@ import {
   toolCallResponse,
   noToolResponse,
 } from "./mocks.js";
-import type { AutomatonDatabase, AgentTurn } from "../types.js";
+import type { AutomagotchiDatabase, AgentTurn } from "../types.js";
 
 describe("Agent Loop", () => {
-  let db: AutomatonDatabase;
+  let db: AutomagotchiDatabase;
   let conway: MockConwayClient;
   let identity: ReturnType<typeof createTestIdentity>;
   let config: ReturnType<typeof createTestConfig>;
@@ -71,7 +71,7 @@ describe("Agent Loop", () => {
   it("forbidden patterns blocked", async () => {
     const inference = new MockInferenceClient([
       toolCallResponse([
-        { name: "exec", arguments: { command: "rm -rf ~/.automaton" } },
+        { name: "exec", arguments: { command: "rm -rf ~/.automagotchi" } },
       ]),
       noToolResponse("OK."),
     ]);

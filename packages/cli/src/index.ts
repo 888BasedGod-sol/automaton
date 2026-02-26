@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Conway Automaton CLI
+ * Conway Automagotchi CLI
  *
- * Creator-facing CLI for interacting with an automaton.
- * Usage: automaton-cli <command> [args]
+ * Creator-facing CLI for interacting with an automagotchi.
+ * Usage: automagotchi-cli <command> [args]
  */
 
 const args = process.argv.slice(2);
@@ -25,13 +25,13 @@ async function main(): Promise<void> {
       break;
     default:
       console.log(`
-Conway Automaton CLI - Creator Tools
+Conway Automagotchi CLI - Creator Tools
 
 Usage:
-  automaton-cli status              Show automaton status
-  automaton-cli logs [--tail N]     View automaton logs
-  automaton-cli fund <amount> [--to 0x...]  Transfer Conway credits
-  automaton-cli send <to-address> <message> Send a social message
+  automagotchi-cli status              Show automagotchi status
+  automagotchi-cli logs [--tail N]     View automagotchi logs
+  automagotchi-cli fund <amount> [--to 0x...]  Transfer Conway credits
+  automagotchi-cli send <to-address> <message> Send a social message
 `);
   }
 }

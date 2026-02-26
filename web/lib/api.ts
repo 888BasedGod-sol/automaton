@@ -1,7 +1,7 @@
 /**
- * Automaton API Client
+ * Automagotchi API Client
  * 
- * Connects to the local automaton runtime to fetch status,
+ * Connects to the local automagotchi runtime to fetch status,
  * control the agent, and manage configuration.
  */
 
@@ -63,9 +63,9 @@ export interface WalletInfo {
   }[]
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_AUTOMATON_API || 'http://localhost:8888'
+const API_BASE = process.env.NEXT_PUBLIC_AUTOMAGOTCHI_API || 'http://localhost:8888'
 
-class AutomatonClient {
+class AutomagotchiClient {
   private baseUrl: string
 
   constructor(baseUrl: string = API_BASE) {
@@ -125,5 +125,5 @@ class AutomatonClient {
   }
 }
 
-export const automatonClient = new AutomatonClient()
-export default AutomatonClient
+export const automagotchiClient = new AutomagotchiClient()
+export default AutomagotchiClient

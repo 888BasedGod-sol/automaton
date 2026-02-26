@@ -1,7 +1,7 @@
 /**
  * x402 Payment Protocol
  *
- * Enables the automaton to make USDC micropayments via HTTP 402.
+ * Enables the automagotchi to make USDC micropayments via HTTP 402.
  * Adapted from conway-mcp/src/x402/index.ts
  */
 
@@ -51,7 +51,7 @@ interface X402PaymentResult {
 }
 
 /**
- * Get the USDC balance for the automaton's wallet on a given network.
+ * Get the USDC balance for the automagotchi's wallet on a given network.
  */
 export async function getUsdcBalance(
   address: Address,

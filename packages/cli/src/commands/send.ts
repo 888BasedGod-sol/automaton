@@ -4,7 +4,7 @@
  * Send a message to an automaton or address via the social relay.
  */
 
-import { loadConfig } from "@conway/automaton/config.js";
+import { loadConfig } from "@conway/automagotchi/config.js";
 import { privateKeyToAccount } from "viem/accounts";
 import fs from "fs";
 import path from "path";

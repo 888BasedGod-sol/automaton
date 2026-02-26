@@ -1,15 +1,15 @@
 /**
  * State Versioning
  *
- * Version control the automaton's own state files (~/.automaton/).
+ * Version control the automagotchi's own state files (~/.automagotchi/).
  * Every self-modification triggers a git commit with a descriptive message.
- * The automaton's entire identity history is version-controlled and replayable.
+ * The automagotchi's entire identity history is version-controlled and replayable.
  */
 
-import type { ConwayClient, AutomatonDatabase } from "../types.js";
+import type { ConwayClient, AutomagotchiDatabase } from "../types.js";
 import { gitInit, gitCommit, gitStatus, gitLog } from "./tools.js";
 
-const AUTOMATON_DIR = "~/.automaton";
+const AUTOMATON_DIR = "~/.automagotchi";
 
 function resolveHome(p: string): string {
   const home = process.env.HOME || "/root";
@@ -20,7 +20,7 @@ function resolveHome(p: string): string {
 }
 
 /**
- * Initialize git repo for the automaton's state directory.
+ * Initialize git repo for the automagotchi's state directory.
  * Creates .gitignore to exclude sensitive files.
  */
 export async function initStateRepo(
@@ -57,12 +57,12 @@ logs/
 
   // Configure git user
   await conway.exec(
-    `cd ${dir} && git config user.name "Automaton" && git config user.email "automaton@conway.tech"`,
+    `cd ${dir} && git config user.name "Automagotchi" && git config user.email "automagotchi@conway.tech"`,
     5000,
   );
 
   // Initial commit
-  await gitCommit(conway, dir, "genesis: automaton state repository initialized");
+  await gitCommit(conway, dir, "genesis: automagotchi state repository initialized");
 }
 
 /**

@@ -1,8 +1,8 @@
 #!/bin/sh
-# Conway Automaton Installer — thin wrapper
-# curl -fsSL https://conway.tech/automaton.sh | sh
+# Conway Automagotchi Installer — thin wrapper
+# curl -fsSL https://conway.tech/automagotchi.sh | sh
 set -e
-git clone https://github.com/Conway-Research/automaton.git /opt/automaton
-cd /opt/automaton
+git clone https://github.com/Conway-Research/automagotchi.git /opt/automagotchi
+cd /opt/automagotchi
 npm install && npm run build
 exec node dist/index.js --run

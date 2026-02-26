@@ -1,15 +1,15 @@
 /**
  * Resource Monitor
  *
- * Continuously monitors the automaton's resources and triggers
+ * Continuously monitors the automagotchi's resources and triggers
  * survival mode transitions when needed.
  */
 
 import type {
-  AutomatonConfig,
-  AutomatonDatabase,
+  AutomagotchiConfig,
+  AutomagotchiDatabase,
   ConwayClient,
-  AutomatonIdentity,
+  AutomagotchiIdentity,
   FinancialState,
   SurvivalTier,
 } from "../types.js";
@@ -28,9 +28,9 @@ export interface ResourceStatus {
  * Check all resources and return current status.
  */
 export async function checkResources(
-  identity: AutomatonIdentity,
+  identity: AutomagotchiIdentity,
   conway: ConwayClient,
-  db: AutomatonDatabase,
+  db: AutomagotchiDatabase,
 ): Promise<ResourceStatus> {
   // Check credits
   let creditsCents = 0;

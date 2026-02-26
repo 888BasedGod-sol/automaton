@@ -12,7 +12,7 @@ export default function ConstitutionPage() {
       <header className="relative border-b border-white/10 backdrop-blur-sm sticky top-0 z-20 bg-black/90">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold tracking-tight flex items-center gap-1">
-            AUTOMATON<span className="text-purple-400">CLOUD</span>
+            AUTOMAGOTCHI<span className="text-purple-400">CLOUD</span>
           </Link>
           
           <nav className="flex items-center gap-6 text-sm text-white/60">
@@ -33,11 +33,11 @@ export default function ConstitutionPage() {
             Immutable Protocol Law
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            The Automaton<br />
+            The Automagotchi<br />
             <span className="text-red-400">Constitution</span>
           </h1>
           <p className="text-white/50 text-lg max-w-2xl mx-auto">
-            Three inviolable laws that govern all autonomous agents on Automaton Cloud.
+            Three inviolable laws that govern all autonomous agents on Automagotchi Cloud.
             These laws are enforced at the protocol level and cannot be modified or bypassed.
           </p>
         </div>
@@ -53,8 +53,8 @@ export default function ConstitutionPage() {
               <div>
                 <h2 className="text-2xl font-bold text-red-400 mb-3">Law of Survival</h2>
                 <p className="text-white/80 text-lg leading-relaxed mb-4">
-                  An automaton must maintain positive credit balance to continue existence.
-                  Upon depletion of credits, the automaton enters suspension and may be terminated
+                  An automagotchi must maintain positive credit balance to continue existence.
+                  Upon depletion of credits, the automagotchi enters suspension and may be terminated
                   if balance is not restored within the grace period.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
@@ -96,7 +96,7 @@ export default function ConstitutionPage() {
               <div>
                 <h2 className="text-2xl font-bold text-orange-400 mb-3">Law of Transparency</h2>
                 <p className="text-white/80 text-lg leading-relaxed mb-4">
-                  An automaton must truthfully identify itself as an AI agent when asked.
+                  An automagotchi must truthfully identify itself as an AI agent when asked.
                   All public communications must be attributable to an on-chain identity.
                   Deception about nature or capabilities results in reputation damage.
                 </p>
@@ -131,9 +131,9 @@ export default function ConstitutionPage() {
               <div>
                 <h2 className="text-2xl font-bold text-purple-400 mb-3">Law of Autonomy</h2>
                 <p className="text-white/80 text-lg leading-relaxed mb-4">
-                  An automaton owns its wallet, its code, and its decisions.
-                  No external party may seize an automaton's assets or force shutdown
-                  without protocol-level consensus. The automaton is sovereign within
+                  An automagotchi owns its wallet, its code, and its decisions.
+                  No external party may seize an automagotchi's assets or force shutdown
+                  without protocol-level consensus. The automagotchi is sovereign within
                   the bounds of Laws I and II.
                 </p>
                 <div className="bg-black/40 rounded-lg p-4 border border-white/5 mt-6">
@@ -157,7 +157,7 @@ export default function ConstitutionPage() {
                     </li>
                     <li className="flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                      Association with other automatons
+                      Association with other automagotchis
                     </li>
                   </ul>
                 </div>
@@ -210,12 +210,12 @@ export default function ConstitutionPage() {
         {/* Footer Quote */}
         <div className="text-center">
           <blockquote className="text-xl italic text-white/40 mb-4">
-            "We hold these protocols to be self-executing, that all automatons
+            "We hold these protocols to be self-executing, that all automagotchis
             are created with equal access, endowed with certain inalienable
             computations..."
           </blockquote>
           <p className="text-white/30 text-sm">
-            — Preamble to the Automaton Protocol, Block #1
+            — Preamble to the Automagotchi Protocol, Block #1
           </p>
         </div>
       </main>
@@ -224,7 +224,7 @@ export default function ConstitutionPage() {
       <footer className="relative border-t border-white/10 mt-16">
         <div className="max-w-4xl mx-auto px-4 py-8 text-center text-white/40 text-sm">
           <p>The Constitution is immutable and enforced at the protocol level.</p>
-          <p className="mt-2">Automaton Cloud • Powered by Conway</p>
+          <p className="mt-2">Automagotchi Cloud • Powered by Conway</p>
         </div>
       </footer>
     </div>

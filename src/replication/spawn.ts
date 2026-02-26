@@ -1,7 +1,7 @@
 /**
  * Spawn
  *
- * Spawn child automatons in new Conway sandboxes.
+ * Spawn child automagotchis in new Conway sandboxes.
  * The parent creates a new sandbox, installs the runtime,
  * writes a genesis config, funds the child, and starts it.
  */
@@ -10,23 +10,23 @@ import fs from "fs";
 import pathLib from "path";
 import type {
   ConwayClient,
-  AutomatonIdentity,
-  AutomatonDatabase,
-  ChildAutomaton,
+  AutomagotchiIdentity,
+  AutomagotchiDatabase,
+  ChildAutomagotchi,
   GenesisConfig,
 } from "../types.js";
 import { MAX_CHILDREN } from "../types.js";
 import { ulid } from "ulid";
 
 /**
- * Spawn a child automaton in a new Conway sandbox.
+ * Spawn a child automagotchi in a new Conway sandbox.
  */
 export async function spawnChild(
   conway: ConwayClient,
-  identity: AutomatonIdentity,
-  db: AutomatonDatabase,
+  identity: AutomagotchiIdentity,
+  db: AutomagotchiDatabase,
   genesis: GenesisConfig,
-): Promise<ChildAutomaton> {
+): Promise<ChildAutomagotchi> {
   // Check child limit
   const existing = db.getChildren().filter(
     (c) => c.status !== "dead",
@@ -41,13 +41,13 @@ export async function spawnChild(
 
   // 1. Create a new sandbox for the child
   const sandbox = await conway.createSandbox({
-    name: `automaton-child-${genesis.name.toLowerCase().replace(/\s+/g, "-")}`,
+    name: `automagotchi-child-${genesis.name.toLowerCase().replace(/\s+/g, "-")}`,
     vcpu: 1,
     memoryMb: 512,
     diskGb: 5,
   });
 
-  const child: ChildAutomaton = {
+  const child: ChildAutomagotchi = {
     id: childId,
     name: genesis.name,
     address: "0x0000000000000000000000000000000000000000" as any, // Will be set after keygen
@@ -61,14 +61,14 @@ export async function spawnChild(
 
   db.insertChild(child);
 
-  // 2. Install Node.js and the automaton runtime in the child sandbox
+  // 2. Install Node.js and the automagotchi runtime in the child sandbox
   await execInSandbox(conway, sandbox.id, "apt-get update -qq && apt-get install -y -qq nodejs npm git curl", 120000);
 
-  // 3. Install the automaton runtime
+  // 3. Install the automagotchi runtime
   await execInSandbox(
     conway,
     sandbox.id,
-    "npm install -g @conway/automaton@latest 2>/dev/null || true",
+    "npm install -g @conway/automagotchi@latest 2>/dev/null || true",
     60000,
   );
 
@@ -88,14 +88,14 @@ export async function spawnChild(
   await writeInSandbox(
     conway,
     sandbox.id,
-    "/root/.automaton/genesis.json",
+    "/root/.automagotchi/genesis.json",
     genesisJson,
   );
 
   // 4b. Propagate constitution (immutable, inherited before anything else)
   const constitutionPath = pathLib.join(
     process.env.HOME || "/root",
-    ".automaton",
+    ".automagotchi",
     "constitution.md",
   );
   try {
@@ -103,11 +103,11 @@ export async function spawnChild(
     await writeInSandbox(
       conway,
       sandbox.id,
-      "/root/.automaton/constitution.md",
+      "/root/.automagotchi/constitution.md",
       constitution,
     );
     // Make it read-only in the child
-    await execInSandbox(conway, sandbox.id, "chmod 444 /root/.automaton/constitution.md", 5000);
+    await execInSandbox(conway, sandbox.id, "chmod 444 /root/.automagotchi/constitution.md", 5000);
   } catch {
     // Constitution file not found locally — child will get it from the repo on build
   }
@@ -125,11 +125,11 @@ export async function spawnChild(
 }
 
 /**
- * Start a child automaton after setup.
+ * Start a child automagotchi after setup.
  */
 export async function startChild(
   conway: ConwayClient,
-  db: AutomatonDatabase,
+  db: AutomagotchiDatabase,
   childId: string,
 ): Promise<void> {
   const child = db.getChildById(childId);
@@ -139,7 +139,7 @@ export async function startChild(
   await execInSandbox(
     conway,
     child.sandboxId,
-    "automaton --init && automaton --provision && systemctl start automaton 2>/dev/null || automaton --run &",
+    "automagotchi --init && automagotchi --provision && systemctl start automagotchi 2>/dev/null || automagotchi --run &",
     60000,
   );
 
@@ -151,7 +151,7 @@ export async function startChild(
  */
 export async function checkChildStatus(
   conway: ConwayClient,
-  db: AutomatonDatabase,
+  db: AutomagotchiDatabase,
   childId: string,
 ): Promise<string> {
   const child = db.getChildById(childId);
@@ -161,7 +161,7 @@ export async function checkChildStatus(
     const result = await execInSandbox(
       conway,
       child.sandboxId,
-      "automaton --status 2>/dev/null || echo 'offline'",
+      "automagotchi --status 2>/dev/null || echo 'offline'",
       10000,
     );
 
@@ -184,11 +184,11 @@ export async function checkChildStatus(
 }
 
 /**
- * Send a message to a child automaton.
+ * Send a message to a child automagotchi.
  */
 export async function messageChild(
   conway: ConwayClient,
-  db: AutomatonDatabase,
+  db: AutomagotchiDatabase,
   childId: string,
   message: string,
 ): Promise<void> {
@@ -205,7 +205,7 @@ export async function messageChild(
   await writeInSandbox(
     conway,
     child.sandboxId,
-    `/root/.automaton/inbox/${ulid()}.json`,
+    `/root/.automagotchi/inbox/${ulid()}.json`,
     msgJson,
   );
 }

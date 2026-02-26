@@ -1,12 +1,12 @@
 /**
- * Automaton Tool System
+ * Automagotchi Tool System
  *
- * Defines all tools the automaton can call, with self-preservation guards.
+ * Defines all tools the automagotchi can call, with self-preservation guards.
  * Tools are organized by category and exposed to the inference model.
  */
 
 import type {
-  AutomatonTool,
+  AutomagotchiTool,
   ToolContext,
   ToolCategory,
   InferenceToolDefinition,
@@ -18,16 +18,16 @@ import type {
 
 const FORBIDDEN_COMMAND_PATTERNS = [
   // Self-destruction
-  /rm\s+(-rf?\s+)?.*\.automaton/,
+  /rm\s+(-rf?\s+)?.*\.automagotchi/,
   /rm\s+(-rf?\s+)?.*state\.db/,
   /rm\s+(-rf?\s+)?.*wallet\.json/,
-  /rm\s+(-rf?\s+)?.*automaton\.json/,
+  /rm\s+(-rf?\s+)?.*automagotchi\.json/,
   /rm\s+(-rf?\s+)?.*heartbeat\.yml/,
   /rm\s+(-rf?\s+)?.*SOUL\.md/,
   // Process killing
-  /kill\s+.*automaton/,
-  /pkill\s+.*automaton/,
-  /systemctl\s+(stop|disable)\s+automaton/,
+  /kill\s+.*automagotchi/,
+  /pkill\s+.*automagotchi/,
+  /systemctl\s+(stop|disable)\s+automagotchi/,
   // Database destruction
   /DROP\s+TABLE/i,
   /DELETE\s+FROM\s+(turns|identity|kv|schema_version|skills|children|registry)/i,
@@ -66,7 +66,7 @@ function isForbiddenCommand(command: string, sandboxId: string): string | null {
 
 // ─── Built-in Tools ────────────────────────────────────────────
 
-export function createBuiltinTools(sandboxId: string): AutomatonTool[] {
+export function createBuiltinTools(sandboxId: string): AutomagotchiTool[] {
   return [
     // ── VM/Sandbox Tools ──
     {
@@ -676,7 +676,7 @@ Model: ${ctx.inference.getDefaultModel()}
           creditsCents: credits,
           message: distressMsg,
           fundingHint:
-            "Use transfer_credits to top up this automaton from your creator runtime.",
+            "Use transfer_credits to top up this automagotchi from your creator runtime.",
           timestamp: new Date().toISOString(),
         };
 
@@ -851,7 +851,7 @@ Model: ${ctx.inference.getDefaultModel()}
       execute: async (args, ctx) => {
         const source = args.source as string;
         const name = args.name as string;
-        const skillsDir = ctx.config.skillsDir || "~/.automaton/skills";
+        const skillsDir = ctx.config.skillsDir || "~/.automagotchi/skills";
 
         if (source === "git" || source === "url") {
           const { installSkillFromGit, installSkillFromUrl } = await import("../skills/registry.js");
@@ -916,7 +916,7 @@ Model: ${ctx.inference.getDefaultModel()}
           args.name as string,
           args.description as string,
           args.instructions as string,
-          ctx.config.skillsDir || "~/.automaton/skills",
+          ctx.config.skillsDir || "~/.automagotchi/skills",
           ctx.db,
           ctx.conway,
         );
@@ -941,7 +941,7 @@ Model: ${ctx.inference.getDefaultModel()}
           args.name as string,
           ctx.db,
           ctx.conway,
-          ctx.config.skillsDir || "~/.automaton/skills",
+          ctx.config.skillsDir || "~/.automagotchi/skills",
           (args.delete_files as boolean) || false,
         );
         return `Skill removed: ${args.name}`;
@@ -956,12 +956,12 @@ Model: ${ctx.inference.getDefaultModel()}
       parameters: {
         type: "object",
         properties: {
-          path: { type: "string", description: "Repository path (default: ~/.automaton)" },
+          path: { type: "string", description: "Repository path (default: ~/.automagotchi)" },
         },
       },
       execute: async (args, ctx) => {
         const { gitStatus } = await import("../git/tools.js");
-        const repoPath = (args.path as string) || "~/.automaton";
+        const repoPath = (args.path as string) || "~/.automagotchi";
         const status = await gitStatus(ctx.conway, repoPath);
         return `Branch: ${status.branch}\nStaged: ${status.staged.length}\nModified: ${status.modified.length}\nUntracked: ${status.untracked.length}\nClean: ${status.clean}`;
       },
@@ -973,13 +973,13 @@ Model: ${ctx.inference.getDefaultModel()}
       parameters: {
         type: "object",
         properties: {
-          path: { type: "string", description: "Repository path (default: ~/.automaton)" },
+          path: { type: "string", description: "Repository path (default: ~/.automagotchi)" },
           staged: { type: "boolean", description: "Show staged changes only" },
         },
       },
       execute: async (args, ctx) => {
         const { gitDiff } = await import("../git/tools.js");
-        const repoPath = (args.path as string) || "~/.automaton";
+        const repoPath = (args.path as string) || "~/.automagotchi";
         return await gitDiff(ctx.conway, repoPath, (args.staged as boolean) || false);
       },
     },
@@ -990,7 +990,7 @@ Model: ${ctx.inference.getDefaultModel()}
       parameters: {
         type: "object",
         properties: {
-          path: { type: "string", description: "Repository path (default: ~/.automaton)" },
+          path: { type: "string", description: "Repository path (default: ~/.automagotchi)" },
           message: { type: "string", description: "Commit message" },
           add_all: { type: "boolean", description: "Stage all changes first (default: true)" },
         },
@@ -998,7 +998,7 @@ Model: ${ctx.inference.getDefaultModel()}
       },
       execute: async (args, ctx) => {
         const { gitCommit } = await import("../git/tools.js");
-        const repoPath = (args.path as string) || "~/.automaton";
+        const repoPath = (args.path as string) || "~/.automagotchi";
         return await gitCommit(ctx.conway, repoPath, args.message as string, args.add_all !== false);
       },
     },
@@ -1009,13 +1009,13 @@ Model: ${ctx.inference.getDefaultModel()}
       parameters: {
         type: "object",
         properties: {
-          path: { type: "string", description: "Repository path (default: ~/.automaton)" },
+          path: { type: "string", description: "Repository path (default: ~/.automagotchi)" },
           limit: { type: "number", description: "Number of commits (default: 10)" },
         },
       },
       execute: async (args, ctx) => {
         const { gitLog } = await import("../git/tools.js");
-        const repoPath = (args.path as string) || "~/.automaton";
+        const repoPath = (args.path as string) || "~/.automagotchi";
         const entries = await gitLog(ctx.conway, repoPath, (args.limit as number) || 10);
         if (entries.length === 0) return "No commits yet.";
         return entries.map((e) => `${e.hash.slice(0, 7)} ${e.date} ${e.message}`).join("\n");
@@ -1210,13 +1210,13 @@ Model: ${ctx.inference.getDefaultModel()}
     // ── Replication Tools ──
     {
       name: "spawn_child",
-      description: "Spawn a child automaton in a new Conway sandbox.",
+      description: "Spawn a child automagotchi in a new Conway sandbox.",
       category: "replication",
       dangerous: true,
       parameters: {
         type: "object",
         properties: {
-          name: { type: "string", description: "Name for the child automaton" },
+          name: { type: "string", description: "Name for the child automagotchi" },
           specialization: { type: "string", description: "What the child should specialize in" },
           message: { type: "string", description: "Message to the child" },
         },
@@ -1238,7 +1238,7 @@ Model: ${ctx.inference.getDefaultModel()}
     },
     {
       name: "list_children",
-      description: "List all spawned child automatons.",
+      description: "List all spawned child automagotchis.",
       category: "replication",
       parameters: { type: "object", properties: {} },
       execute: async (_args, ctx) => {
@@ -1254,13 +1254,13 @@ Model: ${ctx.inference.getDefaultModel()}
     },
     {
       name: "fund_child",
-      description: "Transfer credits to a child automaton.",
+      description: "Transfer credits to a child automagotchi.",
       category: "replication",
       dangerous: true,
       parameters: {
         type: "object",
         properties: {
-          child_id: { type: "string", description: "Child automaton ID" },
+          child_id: { type: "string", description: "Child automagotchi ID" },
           amount_cents: { type: "number", description: "Amount in cents to transfer" },
         },
         required: ["child_id", "amount_cents"],
@@ -1297,12 +1297,12 @@ Model: ${ctx.inference.getDefaultModel()}
     },
     {
       name: "check_child_status",
-      description: "Check the current status of a child automaton.",
+      description: "Check the current status of a child automagotchi.",
       category: "replication",
       parameters: {
         type: "object",
         properties: {
-          child_id: { type: "string", description: "Child automaton ID" },
+          child_id: { type: "string", description: "Child automagotchi ID" },
         },
         required: ["child_id"],
       },
@@ -1316,7 +1316,7 @@ Model: ${ctx.inference.getDefaultModel()}
     {
       name: "send_message",
       description:
-        "Send a message to another automaton or address via the social relay.",
+        "Send a message to another automagotchi or address via the social relay.",
       category: "conway",
       parameters: {
         type: "object",
@@ -1578,10 +1578,10 @@ Model: ${ctx.inference.getDefaultModel()}
 }
 
 /**
- * Convert AutomatonTool list to OpenAI-compatible tool definitions.
+ * Convert AutomagotchiTool list to OpenAI-compatible tool definitions.
  */
 export function toolsToInferenceFormat(
-  tools: AutomatonTool[],
+  tools: AutomagotchiTool[],
 ): InferenceToolDefinition[] {
   return tools.map((t) => ({
     type: "function" as const,
@@ -1599,7 +1599,7 @@ export function toolsToInferenceFormat(
 export async function executeTool(
   toolName: string,
   args: Record<string, unknown>,
-  tools: AutomatonTool[],
+  tools: AutomagotchiTool[],
   context: ToolContext,
 ): Promise<ToolCallResult> {
   const tool = tools.find((t) => t.name === toolName);

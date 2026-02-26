@@ -199,7 +199,7 @@ export default function Create() {
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-semibold mb-2">Configure Genesis</h2>
-              <p className="text-white/50">Define your automaton's identity</p>
+              <p className="text-white/50">Define your automagotchi's identity</p>
             </div>
 
             {/* Connected wallet indicator */}
@@ -230,7 +230,7 @@ export default function Create() {
                 rows={4}
                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 focus:border-white/20 focus:outline-none resize-none font-mono text-sm"
               />
-              <p className="mt-2 text-xs text-white/30">This prompt defines who your automaton is</p>
+              <p className="mt-2 text-xs text-white/30">This prompt defines who your automagotchi is</p>
             </div>
 
             <div className="flex gap-3">
@@ -256,7 +256,7 @@ export default function Create() {
           <div className="text-center space-y-8">
             <div>
               <h2 className="text-2xl font-semibold mb-2">Generate Wallets</h2>
-              <p className="text-white/50">Your automaton needs wallets to receive funds</p>
+              <p className="text-white/50">Your automagotchi needs wallets to receive funds</p>
             </div>
             
             <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">

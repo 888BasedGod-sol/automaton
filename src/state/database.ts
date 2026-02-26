@@ -1,7 +1,7 @@
 /**
- * Automaton Database
+ * Automagotchi Database
  *
- * SQLite-backed persistent state for the automaton.
+ * SQLite-backed persistent state for the automagotchi.
  * Uses better-sqlite3 for synchronous, single-process access.
  */
 
@@ -9,7 +9,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import type {
-  AutomatonDatabase,
+  AutomagotchiDatabase,
   AgentTurn,
   AgentState,
   ToolCallResult,
@@ -18,7 +18,7 @@ import type {
   InstalledTool,
   ModificationEntry,
   Skill,
-  ChildAutomaton,
+  ChildAutomagotchi,
   ChildStatus,
   RegistryEntry,
   ReputationEntry,
@@ -26,7 +26,7 @@ import type {
 } from "../types.js";
 import { SCHEMA_VERSION, CREATE_TABLES, MIGRATION_V2, MIGRATION_V3 } from "./schema.js";
 
-export function createDatabase(dbPath: string): AutomatonDatabase {
+export function createDatabase(dbPath: string): AutomagotchiDatabase {
   // Ensure directory exists
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {
@@ -319,21 +319,21 @@ export function createDatabase(dbPath: string): AutomatonDatabase {
 
   // ─── Children ──────────────────────────────────────────────
 
-  const getChildren = (): ChildAutomaton[] => {
+  const getChildren = (): ChildAutomagotchi[] => {
     const rows = db
       .prepare("SELECT * FROM children ORDER BY created_at DESC")
       .all() as any[];
     return rows.map(deserializeChild);
   };
 
-  const getChildById = (id: string): ChildAutomaton | undefined => {
+  const getChildById = (id: string): ChildAutomagotchi | undefined => {
     const row = db
       .prepare("SELECT * FROM children WHERE id = ?")
       .get(id) as any | undefined;
     return row ? deserializeChild(row) : undefined;
   };
 
-  const insertChild = (child: ChildAutomaton): void => {
+  const insertChild = (child: ChildAutomagotchi): void => {
     db.prepare(
       `INSERT INTO children (id, name, address, sandbox_id, genesis_prompt, creator_message, funded_amount_cents, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -580,7 +580,7 @@ function deserializeSkill(row: any): Skill {
   };
 }
 
-function deserializeChild(row: any): ChildAutomaton {
+function deserializeChild(row: any): ChildAutomagotchi {
   return {
     id: row.id,
     name: row.name,

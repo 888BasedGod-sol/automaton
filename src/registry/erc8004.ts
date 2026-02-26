@@ -1,7 +1,7 @@
 /**
  * ERC-8004 On-Chain Agent Registration
  *
- * Registers the automaton on-chain as a Trustless Agent via ERC-8004.
+ * Registers the automagotchi on-chain as a Trustless Agent via ERC-8004.
  * Uses the Identity Registry on Base mainnet.
  *
  * Contract: 0x8004A169FB4a3325136EB29fA0ceB6D2e539a432 (Base)
@@ -22,7 +22,7 @@ import type {
   RegistryEntry,
   ReputationEntry,
   DiscoveredAgent,
-  AutomatonDatabase,
+  AutomagotchiDatabase,
 } from "../types.js";
 
 // ─── Contract Addresses ──────────────────────────────────────
@@ -59,14 +59,14 @@ const REPUTATION_ABI = parseAbi([
 type Network = "mainnet" | "testnet";
 
 /**
- * Register the automaton on-chain with ERC-8004.
+ * Register the automagotchi on-chain with ERC-8004.
  * Returns the agent ID (NFT token ID).
  */
 export async function registerAgent(
   account: PrivateKeyAccount,
   agentURI: string,
   network: Network = "mainnet",
-  db: AutomatonDatabase,
+  db: AutomagotchiDatabase,
 ): Promise<RegistryEntry> {
   const contracts = CONTRACTS[network];
   const chain = contracts.chain;
@@ -125,7 +125,7 @@ export async function updateAgentURI(
   agentId: string,
   newAgentURI: string,
   network: Network = "mainnet",
-  db: AutomatonDatabase,
+  db: AutomagotchiDatabase,
 ): Promise<string> {
   const contracts = CONTRACTS[network];
   const chain = contracts.chain;
@@ -163,7 +163,7 @@ export async function leaveFeedback(
   score: number,
   comment: string,
   network: Network = "mainnet",
-  db: AutomatonDatabase,
+  db: AutomagotchiDatabase,
 ): Promise<string> {
   const contracts = CONTRACTS[network];
   const chain = contracts.chain;

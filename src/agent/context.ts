@@ -8,7 +8,7 @@
 import type {
   ChatMessage,
   AgentTurn,
-  AutomatonDatabase,
+  AutomagotchiDatabase,
   InferenceClient,
 } from "../types.js";
 

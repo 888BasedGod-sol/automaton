@@ -4,7 +4,7 @@
  * Transfer Conway credits using the configured Conway API key.
  */
 
-import { loadConfig } from "@conway/automaton/config.js";
+import { loadConfig } from "@conway/automagotchi/config.js";
 
 const args = process.argv.slice(3);
 const amount = args[0];

@@ -99,11 +99,13 @@ let cachedSolPrice: number | null = null;
 let priceLastFetched: number = 0;
 const PRICE_CACHE_TTL_MS = 1 * 60 * 1000; // 1 minute
 
-// Runtime cost - $1/hour for simple math
-const HOURLY_COST_USD = 1.00; // Cost per hour of runtime
+// Runtime cost based on heartbeat rate
+// 15s intervals = 240 heartbeats/hour × $0.50/heartbeat = $120/hour
+const HOURLY_COST_USD = 120.00; // Cost per hour of runtime
 
 /**
- * Fetch real-time SOL price in USDC from Jupiter Price API
+ * Fetch real-time SOL price in USDC
+ * Tries Jupiter → Birdeye → CoinGecko → fallback
  */
 export async function getSolPrice(): Promise<number> {
   const now = Date.now();
@@ -113,36 +115,76 @@ export async function getSolPrice(): Promise<number> {
     return cachedSolPrice;
   }
   
+  // Try Jupiter first
   try {
     const response = await fetch(
-      `https://price.jup.ag/v6/price?ids=${SOL_MINT}&vsToken=${USDC_MINT}`
+      `https://price.jup.ag/v6/price?ids=${SOL_MINT}&vsToken=${USDC_MINT}`,
+      { signal: AbortSignal.timeout(5000) }
     );
     
-    if (!response.ok) {
-      throw new Error('Failed to fetch SOL price from Jupiter');
+    if (response.ok) {
+      const data = await response.json();
+      const price = data.data?.[SOL_MINT]?.price;
+      
+      if (price && typeof price === 'number') {
+        cachedSolPrice = price;
+        priceLastFetched = now;
+        return price;
+      }
     }
-    
-    const data = await response.json();
-    const price = data.data?.[SOL_MINT]?.price;
-    
-    if (!price || typeof price !== 'number') {
-      throw new Error('Invalid price data from Jupiter');
-    }
-    
-    // Update cache
-    cachedSolPrice = price;
-    priceLastFetched = now;
-    
-    return price;
   } catch (error) {
-    // If we have a cached price, use it as fallback
-    if (cachedSolPrice !== null) {
-      console.warn('Failed to fetch SOL price, using cached value:', cachedSolPrice);
-      return cachedSolPrice;
-    }
-    // Last resort fallback - Feb 2026 estimate
-    return 170;
+    // Continue to next source
   }
+  
+  // Try Birdeye public API
+  try {
+    const response = await fetch(
+      `https://public-api.birdeye.so/public/price?address=${SOL_MINT}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      const price = data?.data?.value;
+      
+      if (price && typeof price === 'number') {
+        cachedSolPrice = price;
+        priceLastFetched = now;
+        return price;
+      }
+    }
+  } catch (error) {
+    // Continue to next source
+  }
+  
+  // Try CoinGecko as fallback
+  try {
+    const response = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd',
+      { signal: AbortSignal.timeout(5000) }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      const price = data?.solana?.usd;
+      
+      if (price && typeof price === 'number') {
+        cachedSolPrice = price;
+        priceLastFetched = now;
+        return price;
+      }
+    }
+  } catch (error) {
+    // Continue to fallback
+  }
+  
+  // If we have a cached price, use it
+  if (cachedSolPrice !== null) {
+    return cachedSolPrice;
+  }
+  
+  // Last resort fallback - current market price
+  return 78;
 }
 
 /**

@@ -2,7 +2,7 @@
  * Conway Inference Client
  *
  * Wraps Conway's /v1/chat/completions endpoint (OpenAI-compatible).
- * The automaton pays for its own thinking through Conway credits.
+ * The automagotchi pays for its own thinking through Conway credits.
  */
 
 import type {

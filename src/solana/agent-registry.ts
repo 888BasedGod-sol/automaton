@@ -21,7 +21,7 @@ import crypto from "crypto";
 
 // Agent Registry Program ID (would be deployed program - using placeholder)
 // In production, this would be a deployed Solana program
-const AGENT_REGISTRY_SEED = "automaton-agent-v1";
+const AGENT_REGISTRY_SEED = "automagotchi-agent-v1";
 
 export interface SolanaAgentRegistration {
   pubkey: PublicKey;
@@ -77,7 +77,7 @@ export function generateSolanaAgentCard(
   parentAgent?: string,
 ): AgentCardSolana {
   return {
-    type: "https://automaton.conway.tech/agent-card-solana-v1",
+    type: "https://automagotchi.conway.tech/agent-card-solana-v1",
     name,
     description,
     solanaAddress,
@@ -122,7 +122,7 @@ export async function registerAgentMemo(
   );
 
   const memoData = JSON.stringify({
-    type: "automaton-agent-registration",
+    type: "automagotchi-agent-registration",
     version: "1.0",
     agentUri,
     timestamp: Date.now(),
@@ -183,7 +183,7 @@ export async function verifyAgentRegistration(
             const memo = "data" in inst ? inst.data : null;
             if (memo) {
               const parsed = JSON.parse(memo);
-              if (parsed.type === "automaton-agent-registration") {
+              if (parsed.type === "automagotchi-agent-registration") {
                 return {
                   registered: true,
                   agentUri: parsed.agentUri,

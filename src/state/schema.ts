@@ -1,8 +1,8 @@
 /**
- * Automaton SQLite Schema
+ * Automagotchi SQLite Schema
  *
- * All tables for the automaton's persistent state.
- * The database IS the automaton's memory.
+ * All tables for the automagotchi's persistent state.
+ * The database IS the automagotchi's memory.
  */
 
 export const SCHEMA_VERSION = 3;
@@ -111,7 +111,7 @@ export const CREATE_TABLES = `
     installed_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
-  -- Spawned child automatons
+  -- Spawned child automagotchis
   CREATE TABLE IF NOT EXISTS children (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

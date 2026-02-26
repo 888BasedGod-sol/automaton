@@ -1,7 +1,7 @@
 /**
  * Jupiter DEX Integration
  *
- * Enables the automaton to swap tokens on Solana via Jupiter aggregator.
+ * Enables the automagotchi to swap tokens on Solana via Jupiter aggregator.
  * Jupiter finds the best price across all Solana DEXs (Raydium, Orca, etc).
  */
 

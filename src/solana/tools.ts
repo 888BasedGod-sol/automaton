@@ -1,11 +1,11 @@
 /**
  * Solana Tools
  *
- * Tools for the automaton to interact with Solana blockchain.
+ * Tools for the automagotchi to interact with Solana blockchain.
  * These are exposed to the agent's tool system.
  */
 
-import type { AutomatonTool, ToolContext } from "../types.js";
+import type { AutomagotchiTool, ToolContext } from "../types.js";
 import { createSolanaClient, type SolanaNetwork } from "./client.js";
 import { 
   getUsdcBalanceSolana, 
@@ -45,9 +45,9 @@ import {
 } from "./market-analysis.js";
 
 /**
- * Create Solana-specific tools for the automaton.
+ * Create Solana-specific tools for the automagotchi.
  */
-export function createSolanaTools(): AutomatonTool[] {
+export function createSolanaTools(): AutomagotchiTool[] {
   return [
     // ── Balance Tools ──
     {
@@ -59,7 +59,7 @@ export function createSolanaTools(): AutomatonTool[] {
         properties: {
           address: {
             type: "string",
-            description: "Solana address (base58). Defaults to automaton's address if not provided.",
+            description: "Solana address (base58). Defaults to automagotchi's address if not provided.",
           },
           network: {
             type: "string",
@@ -92,7 +92,7 @@ export function createSolanaTools(): AutomatonTool[] {
         properties: {
           address: {
             type: "string",
-            description: "Solana address (base58). Defaults to automaton's address.",
+            description: "Solana address (base58). Defaults to automagotchi's address.",
           },
           network: {
             type: "string",
@@ -125,7 +125,7 @@ export function createSolanaTools(): AutomatonTool[] {
         properties: {
           address: {
             type: "string",
-            description: "Solana address (base58). Defaults to automaton's address.",
+            description: "Solana address (base58). Defaults to automagotchi's address.",
           },
           network: {
             type: "string",
@@ -161,7 +161,7 @@ export function createSolanaTools(): AutomatonTool[] {
     // ── Transfer Tools ──
     {
       name: "solana_transfer_sol",
-      description: "Transfer SOL to another address. Requires automaton wallet.",
+      description: "Transfer SOL to another address. Requires automagotchi wallet.",
       category: "financial",
       dangerous: true,
       parameters: {
@@ -266,7 +266,7 @@ export function createSolanaTools(): AutomatonTool[] {
     // ── Registry Tools ──
     {
       name: "solana_register_agent",
-      description: "Register the automaton as an agent on Solana using memo transactions.",
+      description: "Register the automagotchi as an agent on Solana using memo transactions.",
       category: "registry",
       parameters: {
         type: "object",
@@ -301,7 +301,7 @@ export function createSolanaTools(): AutomatonTool[] {
 
     {
       name: "solana_verify_agent",
-      description: "Verify if an address is a registered automaton agent on Solana.",
+      description: "Verify if an address is a registered automagotchi agent on Solana.",
       category: "registry",
       parameters: {
         type: "object",
@@ -358,7 +358,7 @@ export function createSolanaTools(): AutomatonTool[] {
         
         const card = generateSolanaAgentCard(
           ctx.config.name,
-          (args.description as string) || `Automaton agent: ${ctx.config.genesisPrompt}`,
+          (args.description as string) || `Automagotchi agent: ${ctx.config.genesisPrompt}`,
           solanaAddress || "",
           evmAddress,
           [
@@ -414,7 +414,7 @@ export function createSolanaTools(): AutomatonTool[] {
 
     {
       name: "solana_wallet_info",
-      description: "Get information about the automaton's Solana wallet.",
+      description: "Get information about the automagotchi's Solana wallet.",
       category: "financial",
       parameters: {
         type: "object",
@@ -425,7 +425,7 @@ export function createSolanaTools(): AutomatonTool[] {
         const address = getSolanaWalletAddress();
         
         if (!address) {
-          return "No Solana wallet configured. The automaton can generate one during setup.";
+          return "No Solana wallet configured. The automagotchi can generate one during setup.";
         }
 
         const network = ctx.config.solanaNetwork || "mainnet-beta";

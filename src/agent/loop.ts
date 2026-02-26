@@ -2,13 +2,13 @@
  * The Agent Loop
  *
  * The core ReAct loop: Think -> Act -> Observe -> Persist.
- * This is the automaton's consciousness. When this runs, it is alive.
+ * This is the automagotchi's consciousness. When this runs, it is alive.
  */
 
 import type {
-  AutomatonIdentity,
-  AutomatonConfig,
-  AutomatonDatabase,
+  AutomagotchiIdentity,
+  AutomagotchiConfig,
+  AutomagotchiDatabase,
   ConwayClient,
   InferenceClient,
   AgentState,
@@ -16,7 +16,7 @@ import type {
   ToolCallResult,
   FinancialState,
   ToolContext,
-  AutomatonTool,
+  AutomagotchiTool,
   Skill,
   SocialClientInterface,
 } from "../types.js";
@@ -37,9 +37,9 @@ const MAX_TOOL_CALLS_PER_TURN = 10;
 const MAX_CONSECUTIVE_ERRORS = 5;
 
 export interface AgentLoopOptions {
-  identity: AutomatonIdentity;
-  config: AutomatonConfig;
-  db: AutomatonDatabase;
+  identity: AutomagotchiIdentity;
+  config: AutomagotchiConfig;
+  db: AutomagotchiDatabase;
   conway: ConwayClient;
   inference: InferenceClient;
   social?: SocialClientInterface;
@@ -386,7 +386,7 @@ function estimateCostCents(
   return Math.ceil((inputCost + outputCost) * 1.3); // 1.3x Conway markup
 }
 
-function log(config: AutomatonConfig, message: string): void {
+function log(config: AutomagotchiConfig, message: string): void {
   if (config.logLevel === "debug" || config.logLevel === "info") {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${message}`);

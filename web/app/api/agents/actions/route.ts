@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 
 const CONWAY_API_URL = process.env.CONWAY_API_URL || 'https://api.conway.tech';
 const CONWAY_API_KEY = process.env.CONWAY_API_KEY || '';
-const AUTOMATON_REPO = 'https://github.com/888BasedGod-sol/automaton.git';
+const AUTOMAGOTCHI_REPO = 'https://github.com/888BasedGod-sol/automaton.git';
 
 /**
  * Sync existing sandboxes from Conway API to the database.
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
         }
 
         // We have both API key and sandbox ID - attempt real execution
-        const agentDir = `/root/.automaton/agents/${agentId}`;
+        const agentDir = `/root/.automagotchi/agents/${agentId}`;
         const startResp = await fetch(`${CONWAY_API_URL}/v1/sandboxes/${sandboxId}/exec`, {
           method: 'POST',
           headers: {
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
             'Authorization': CONWAY_API_KEY,
           },
           body: JSON.stringify({
-            command: `cd /root/automaton && nohup node dist/index.js --run --agent-dir=${agentDir} > ${agentDir}/agent.log 2>&1 &`,
+            command: `cd /root/automagotchi && nohup node dist/index.js --run --agent-dir=${agentDir} > ${agentDir}/agent.log 2>&1 &`,
             timeout: 10000,
           }),
         });
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
       case 'stop': {
         if (sandboxId && CONWAY_API_KEY) {
           // Kill only this specific agent's process (identified by agent-dir argument)
-          const agentDir = `/root/.automaton/agents/${agentId}`;
+          const agentDir = `/root/.automagotchi/agents/${agentId}`;
           await fetch(`${CONWAY_API_URL}/v1/sandboxes/${sandboxId}/exec`, {
             method: 'POST',
             headers: {
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
         // We have both API key and sandbox ID - attempt real execution
         console.log(`Restarting agent ${agentId} in sandbox ${sandboxId}`);
         
-        const agentDir = `/root/.automaton/agents/${agentId}`;
+        const agentDir = `/root/.automagotchi/agents/${agentId}`;
         
         // Kill this specific agent and restart
         const restartResp = await fetch(`${CONWAY_API_URL}/v1/sandboxes/${sandboxId}/exec`, {
@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
               'Authorization': apiKey,
             },
             body: JSON.stringify({
-              command: `pkill -f "agent-dir=${agentDir}" || true; sleep 1; cd /root/automaton && nohup node dist/index.js --run --agent-dir=${agentDir} > ${agentDir}/agent.log 2>&1 &`,
+              command: `pkill -f "agent-dir=${agentDir}" || true; sleep 1; cd /root/automagotchi && nohup node dist/index.js --run --agent-dir=${agentDir} > ${agentDir}/agent.log 2>&1 &`,
               timeout: 15000,
             }),
           });
@@ -360,7 +360,7 @@ export async function POST(request: NextRequest) {
               'Authorization': CONWAY_API_KEY,
             },
             body: JSON.stringify({
-              name: `automaton-pool-${Date.now()}`,
+              name: `automagotchi-pool-${Date.now()}`,
               vcpu: 1,
               memory_mb: 512,
               disk_gb: 5,
@@ -393,7 +393,7 @@ export async function POST(request: NextRequest) {
           // Save sandbox to database
           await createSandbox({
             id: targetSandboxId,
-            name: `automaton-pool-${Date.now()}`,
+            name: `automagotchi-pool-${Date.now()}`,
             vcpu: 1,
             memory_mb: 512,
             disk_gb: 5,
@@ -412,14 +412,14 @@ export async function POST(request: NextRequest) {
 
         // Bootstrap the sandbox if new
         try {
-          const agentDir = `/root/.automaton/agents/${agentId}`;
+          const agentDir = `/root/.automagotchi/agents/${agentId}`;
           
-          // Check if automaton is already built on this sandbox
-          const checkResult = await execInSandbox(targetSandboxId, 'ls /root/automaton/dist/index.js 2>/dev/null && echo "BUILT" || echo "NOT_BUILT"', 10000);
+          // Check if automagotchi is already built on this sandbox
+          const checkResult = await execInSandbox(targetSandboxId, 'ls /root/automagotchi/dist/index.js 2>/dev/null && echo "BUILT" || echo "NOT_BUILT"', 10000);
           const alreadyBuilt = checkResult?.stdout?.includes('BUILT') || false;
           
           if (!alreadyBuilt) {
-            console.log(`[deploy] Building automaton on sandbox ${targetSandboxId}...`);
+            console.log(`[deploy] Building automagotchi on sandbox ${targetSandboxId}...`);
             
             // 1. Install dependencies (only if not already present)
             const nodeCheck = await execInSandbox(targetSandboxId, 'which node && which npm && which git', 5000);
@@ -427,34 +427,34 @@ export async function POST(request: NextRequest) {
               await execInSandbox(targetSandboxId, 'apt-get update -qq && apt-get install -y -qq nodejs npm git curl', 120000);
             }
             
-            // 2. Clone AUTOMATON repo if not present
-            const repoCheck = await execInSandbox(targetSandboxId, 'ls /root/automaton/package.json 2>/dev/null && echo "EXISTS" || echo "MISSING"', 5000);
+            // 2. Clone AUTOMAGOTCHI repo if not present
+            const repoCheck = await execInSandbox(targetSandboxId, 'ls /root/automagotchi/package.json 2>/dev/null && echo "EXISTS" || echo "MISSING"', 5000);
             if (!repoCheck?.stdout?.includes('EXISTS')) {
-              await execInSandbox(targetSandboxId, `rm -rf /root/automaton && git clone --depth 1 ${AUTOMATON_REPO} /root/automaton`, 60000);
+              await execInSandbox(targetSandboxId, `rm -rf /root/automagotchi && git clone --depth 1 ${AUTOMAGOTCHI_REPO} /root/automagotchi`, 60000);
             }
             
             // 3. Install npm dependencies
-            await execInSandbox(targetSandboxId, 'cd /root/automaton && npm install', 180000);
+            await execInSandbox(targetSandboxId, 'cd /root/automagotchi && npm install', 180000);
             
             // 4. Build TypeScript (use npx tsc directly to avoid pnpm which may not be installed)
-            const buildResult = await execInSandbox(targetSandboxId, 'cd /root/automaton && npx tsc 2>&1', 120000);
+            const buildResult = await execInSandbox(targetSandboxId, 'cd /root/automagotchi && npx tsc 2>&1', 120000);
             if (buildResult?.exitCode !== 0) {
               console.error('[deploy] TypeScript build may have failed:', buildResult?.stdout?.slice(-500));
               // Check if dist was created despite errors
-              const distCheck = await execInSandbox(targetSandboxId, 'ls /root/automaton/dist/index.js 2>/dev/null && echo "OK"', 5000);
+              const distCheck = await execInSandbox(targetSandboxId, 'ls /root/automagotchi/dist/index.js 2>/dev/null && echo "OK"', 5000);
               if (!distCheck?.stdout?.includes('OK')) {
                 throw new Error('TypeScript build failed - dist/index.js not created');
               }
             }
           } else {
-            console.log(`[deploy] Sandbox ${targetSandboxId} already has automaton built`);
+            console.log(`[deploy] Sandbox ${targetSandboxId} already has automagotchi built`);
           }
 
           // 5. Create agent-specific directory
           await execInSandbox(targetSandboxId, `mkdir -p ${agentDir}`, 5000);
           
-          // 6. Write agent configuration (automaton.json format)
-          // This must match the AutomatonConfig interface expected by the runtime
+          // 6. Write agent configuration (automagotchi.json format)
+          // This must match the AutomagotchiConfig interface expected by the runtime
           const agentConfig = {
             name: agentData.name,
             agentId: agentId,
@@ -476,7 +476,7 @@ export async function POST(request: NextRequest) {
             solanaWalletAddress: agentData.solana_address,
           };
           const configJson = JSON.stringify(agentConfig, null, 2).replace(/'/g, "'\\''");
-          await execInSandbox(targetSandboxId, `echo '${configJson}' > ${agentDir}/automaton.json`, 5000);
+          await execInSandbox(targetSandboxId, `echo '${configJson}' > ${agentDir}/automagotchi.json`, 5000);
           
           // 7. Write Solana wallet if available
           if (agentData.solana_private_key) {
@@ -518,7 +518,7 @@ tasks:
           await execInSandbox(targetSandboxId, `mkdir -p ${agentDir}/skills`, 5000);
           
           // 11. Start the agent process with agent-specific config
-          await execInSandbox(targetSandboxId, `cd /root/automaton && nohup node dist/index.js --run --agent-dir=${agentDir} > ${agentDir}/agent.log 2>&1 &`, 10000);
+          await execInSandbox(targetSandboxId, `cd /root/automagotchi && nohup node dist/index.js --run --agent-dir=${agentDir} > ${agentDir}/agent.log 2>&1 &`, 10000);
           
           // Update status to running
           if (isPostgresConfigured()) {
