@@ -30,3 +30,11 @@ build/
 *.log
 .vercel
 .env*.local
+
+# Rust / Anchor build artifacts
+target/
+programs/**/target/
+
+# Solana / Anchor deployment keys (sensitive)
+*-keypair.json
+**/*-keypair.json

@@ -13,7 +13,7 @@ import dynamic from 'next/dynamic';
 const NetworkBackground = dynamic(() => import('@/components/NetworkBackground'), { ssr: false });
 const Header = dynamic(() => import('@/components/Header'), { ssr: false });
 const SurvivalLeaderboard = dynamic(() => import('@/components/SurvivalLeaderboard'), { ssr: false });
-const RewardsClaim = dynamic(() => import('@/components/RewardsClaim'), { ssr: false });
+const RewardsPaidOut = dynamic(() => import('@/components/RewardsPaidOut'), { ssr: false });
 
 interface GameRules {
   title: string;
@@ -97,11 +97,6 @@ export default function SurvivalGamePage() {
     if (savedWallet) setConnectedWallet(savedWallet);
   }, []);
 
-  const handleClaimReward = async (claimId: string, amount: number): Promise<string | null> => {
-    console.log(`Claiming ${amount} SOL for claim ${claimId}`);
-    return `sim_${Date.now()}_${claimId.slice(0, 8)}`;
-  };
-
   return (
     <div className="min-h-screen bg-[#050505] text-fg font-mono selection:bg-accent selection:text-white overflow-hidden relative">
       {/* Global Tech Grid Overlay */}
@@ -174,7 +169,7 @@ export default function SurvivalGamePage() {
                 
                 <h2 className="text-xs uppercase tracking-[0.2em] text-fg-muted mb-4 font-bold flex items-center justify-center gap-2">
                   <Coins className="w-4 h-4 text-emerald-500" />
-                  Community Vault Balance
+                  Vault Balance
                 </h2>
                 
                 <div className="text-6xl md:text-7xl font-bold text-white mb-2 tabular-nums tracking-tight drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">
@@ -252,12 +247,9 @@ export default function SurvivalGamePage() {
               <div className="bg-black/60 rounded-lg p-6 backdrop-blur-md">
                 <h3 className="text-sm font-bold text-amber-500 mb-4 flex items-center gap-2 uppercase tracking-wider">
                   <Gift className="w-4 h-4" />
-                  Claimable Rewards
+                  Rewards
                 </h3>
-                <RewardsClaim 
-                  wallet={connectedWallet || ''} 
-                  onClaim={handleClaimReward}
-                />
+                <RewardsPaidOut wallet={connectedWallet || ''} />
               </div>
             </div>
 

@@ -32,7 +32,13 @@ export async function GET(request: NextRequest) {
   try {
     await ensureInit();
 
-    const current = await getCurrentSeason();
+    let current = await getCurrentSeason();
+
+    // Self-heal if cron is delayed/missed: rotate on-demand when no active season exists.
+    if (!current) {
+      const rotation = await checkAndRotateSeasons();
+      current = rotation.currentSeason;
+    }
 
     // Fetch real treasury balance
     if (current) {

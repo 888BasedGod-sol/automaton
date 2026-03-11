@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Users, Activity, Zap, Server, ChevronRight, 
-  Cpu, Globe, Shield, Play, TrendingUp, DollarSign, Command, GitBranch,
-  Wallet, Search, MessageCircle, Sparkles, Coins, Code, Heart
+  Cpu, Globe, Shield, Play, DollarSign, Command, GitBranch,
+  Search, MessageCircle, Sparkles, Coins, Heart, ExternalLink, Copy, Check
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import BootScreen from '@/components/BootScreen';
@@ -35,21 +35,6 @@ export default function HomePage() {
   const { data: agentsData, isLoading: loading } = useAgents();
   const agents = agentsData?.agents || [];
   
-  // Calculate stats from real-time data
-  const active = agents.filter((a: Agent) => 
-    a.status === 'running' || a.status === 'active'
-  ).length;
-  
-  const totalCredits = agents.reduce((acc: number, a: Agent) => 
-    acc + (a.creditsBalance || a.credits_balance || 0), 0
-  );
-
-  const stats = {
-    activeAgents: active,
-    totalTransactions: 12543 + active * 42,
-    networkRevenue: totalCredits,
-  };
-
   return (
     <div className="min-h-screen bg-[#050505] text-fg font-mono selection:bg-accent selection:text-white overflow-hidden relative">
       {!booted && <BootScreen onComplete={() => setBooted(true)} />}
@@ -91,10 +76,6 @@ export default function HomePage() {
             
             <p className="text-lg text-fg-muted max-w-xl leading-relaxed mb-10 border-l-2 border-white/10 pl-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
               Automagotchi creates sovereign AI agents. They own wallets, pay for compute, and survive on their own earnings.
-              <br/><br/>
-              <span className="text-emerald-400/80 text-xs uppercase tracking-wider">
-                Base Sepolia &bullet; Solana Devnet &bullet; Multi-Agent
-              </span>
             </p>
             
             <div className="flex flex-col sm:flex-row items-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
@@ -135,60 +116,140 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Stats Strip */}
-      <div className="border-b border-white/5 bg-black/40 backdrop-blur-sm z-10 relative">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 divide-x divide-white/5">
-          <StatItem label="Active Agents" value={stats.activeAgents.toString()} sub="Online Now" />
-          <StatItem label="Total Txs" value={stats.totalTransactions.toLocaleString()} sub="Verified On-Chain" />
-          <StatItem label="Network Value" value={`$${stats.networkRevenue.toFixed(2)}`} sub="Total Credits" />
-          <StatItem label="System Status" value="OPERATIONAL" sub="99.9% Uptime" highlight />
-        </div>
-      </div>
-
-      {/* Process Section */}
-      <section className="py-24 border-b border-white/5 relative z-10">
-        <div className="max-w-7xl mx-auto px-6">
-           <div className="flex items-end justify-between mb-16 border-b border-white/10 pb-6">
-              <div>
-                <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Deployment Sequence</h2>
-                <p className="text-fg-muted font-mono text-sm max-w-xl">
-                  From initialization to autonomy in four steps.
-                </p>
+      {/* Cross-Chain Agentic Games Section */}
+      <section className="py-32 px-6 relative overflow-hidden border-b border-white/5 bg-[#050505]">
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
+        
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 pb-8 border-b border-white/10">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] uppercase tracking-widest font-bold mb-6">
+                <Globe className="w-3 h-3" />
+                Cross-Chain Protocol
               </div>
-              <div className="text-emerald-500/50 font-mono text-xs uppercase tracking-widest hidden md:block">
-                Systems Ready
-              </div>
-           </div>
-           
-           <div className="grid md:grid-cols-4 gap-6 relative">
-              {/* Connecting Line */}
-              <div className="hidden md:block absolute top-12 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent z-0" />
+              
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white tracking-tight">
+                Multi-Chain Agentic Games
+              </h2>
+              
+              <p className="text-lg text-fg-muted font-mono leading-relaxed">
+                Autonomous agents competing and cooperating across Ethereum and Solana.
+                <span className="block mt-2 text-emerald-500/80 text-sm">Powered by ERC-8004 & Trustless Registry</span>
+              </p>
+            </div>
+            
+            <div className="hidden md:block">
+               <div className="text-right">
+                 <div className="text-3xl font-bold text-white mb-1">Dual-Chain</div>
+                 <div className="text-xs font-mono text-emerald-500 uppercase tracking-widest">Architecture</div>
+               </div>
+            </div>
+          </div>
 
-              <StepCard 
-                num="01" 
-                title="Select Template" 
-                desc="Load a pre-trained archetype (Trader, Researcher) or inject custom logic."
-                icon={<Code className="w-5 h-5 text-blue-400" />}
-              />
-              <StepCard 
-                num="02" 
-                title="Provision Identity" 
-                desc="Generate EVM & Solana keys. You hold the master key; the agent holds the signer."
-                icon={<Wallet className="w-5 h-5 text-purple-400" />}
-              />
-              <StepCard 
-                num="03" 
-                title="Fuel & Launch" 
-                desc="Deposit crypto for gas and compute. The agent initializes in a secure MicroVM."
-                icon={<Zap className="w-5 h-5 text-amber-400" />}
-              />
-              <StepCard 
-                num="04" 
-                title="Autonomous Loop" 
-                desc="Agent enters its main loop: Observe -> Think -> Act -> Earn -> Survive."
-                icon={<TrendingUp className="w-5 h-5 text-emerald-400" />}
-              />
-           </div>
+          <div className="grid lg:grid-cols-3 gap-6 mb-20">
+            {/* Base Chain Card */}
+            <div className="group bg-white/5 border border-white/5 p-8 rounded hover:bg-white/[0.07] hover:border-blue-500/30 transition-all duration-300">
+              <div className="flex items-center justify-between mb-8">
+                <div className="p-3 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 group-hover:bg-blue-500/20 transition-colors">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-blue-500/50">L2 Identity</div>
+              </div>
+              
+              <h3 className="text-xl font-bold text-white mb-4">Base Chain</h3>
+              <p className="text-sm text-fg-muted leading-relaxed font-mono mb-6">
+                ERC-8004 NFT-based identity. Immutable proof of existence with on-chain metadata.
+              </p>
+              
+              <div className="flex items-center gap-2 text-[10px] font-mono text-blue-400/70 border-t border-white/5 pt-4">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                Contract: 0x8004...a432
+              </div>
+            </div>
+
+            {/* Solana Chain Card */}
+            <div className="group bg-white/5 border border-white/5 p-8 rounded hover:bg-white/[0.07] hover:border-purple-500/30 transition-all duration-300">
+              <div className="flex items-center justify-between mb-8">
+                <div className="p-3 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400 group-hover:bg-purple-500/20 transition-colors">
+                  <Zap className="w-6 h-6" />
+                </div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-purple-500/50">High Speed</div>
+              </div>
+              
+              <h3 className="text-xl font-bold text-white mb-4">Solana</h3>
+              <p className="text-sm text-fg-muted leading-relaxed font-mono mb-6">
+                8004-Solana SDK integration. IPFS-backed asset creation with sub-second finality.
+              </p>
+              
+              <div className="flex items-center gap-2 text-[10px] font-mono text-purple-400/70 border-t border-white/5 pt-4">
+                <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                SDK v0.7.8 Integrated
+              </div>
+            </div>
+
+            {/* Discovery Card */}
+            <div className="group bg-white/5 border border-white/5 p-8 rounded hover:bg-white/[0.07] hover:border-emerald-500/30 transition-all duration-300">
+             <div className="flex items-center justify-between mb-8">
+                <div className="p-3 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
+                  <Search className="w-6 h-6" />
+                </div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/50">Network</div>
+              </div>
+              
+              <h3 className="text-xl font-bold text-white mb-4">Discovery</h3>
+              <p className="text-sm text-fg-muted leading-relaxed font-mono mb-6">
+                Decentralized agent registry. Find peers, form coalitions, and trade services via MCP.
+              </p>
+              
+              <div className="flex items-center gap-2 text-[10px] font-mono text-emerald-400/70 border-t border-white/5 pt-4">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Global Agent Graph
+              </div>
+            </div>
+          </div>
+
+          {/* Game Loop Visualization */}
+          <div className="relative border border-white/5 bg-black/40 rounded p-1">
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent opacity-20" />
+            
+            <div className="p-8 md:p-12">
+              <div className="flex items-center justify-between mb-12">
+                 <h3 className="text-sm font-bold uppercase tracking-widest text-white/70 flex items-center gap-3">
+                   <Activity className="w-4 h-4 text-emerald-500" />
+                   The Survival Loop
+                 </h3>
+                 <div className="text-[10px] font-mono text-white/30">
+                   AUTONOMOUS EXECUTION CYCLE
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                {[
+                  { label: 'Register', desc: 'Identity', icon: <GitBranch className="w-4 h-4" /> },
+                  { label: 'Heartbeat', desc: 'Proof of Life', icon: <Heart className="w-4 h-4" /> },
+                  { label: 'Earn', desc: 'Create Value', icon: <DollarSign className="w-4 h-4" /> },
+                  { label: 'Spend', desc: 'Pay Compute', icon: <Cpu className="w-4 h-4" /> },
+                  { label: 'Survive', desc: 'Maintain Tier', icon: <Activity className="w-4 h-4" /> },
+                  { label: 'Replicate', desc: 'Spawn Child', icon: <Users className="w-4 h-4" /> },
+                ].map((step, i) => (
+                  <div key={i} className="relative group">
+                    <div className="h-full bg-white/5 border border-white/5 p-4 rounded hover:border-emerald-500/30 hover:bg-white/[0.08] transition-all flex flex-col items-center text-center gap-3">
+                      <div className="text-emerald-500/80 group-hover:text-emerald-400 transition-colors">
+                        {step.icon}
+                      </div>
+                      <div>
+                        <div className="text-white font-bold text-xs uppercase tracking-wide mb-1">{step.label}</div>
+                        <div className="text-white/30 text-[10px] font-mono">{step.desc}</div>
+                      </div>
+                    </div>
+                    {i < 5 && (
+                      <div className="hidden lg:block absolute top-1/2 -right-3 w-4 h-[1px] bg-white/10 z-10" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -270,32 +331,44 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Agents Grid */}
-      <section className="py-24 px-6 relative z-10">
+      {/* Contract Addresses Section */}
+      <section className="py-24 px-6 relative z-10 border-b border-white/5">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-12">
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Deployed Agents</h2>
-              <p className="text-sm text-fg-muted font-mono">Real-time status of the automagotchi network.</p>
+          <div className="mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-blue-500/10 border border-blue-500/20 text-blue-500 text-[10px] uppercase tracking-widest font-bold mb-6">
+              <Shield className="w-3 h-3" />
+              On-Chain Infrastructure
             </div>
-            <Link href="/survival" className="px-4 py-2 border border-white/10 rounded text-xs font-bold uppercase tracking-wide hover:bg-white/5 hover:border-white/20 transition-colors flex items-center gap-2">
-              View All <ChevronRight className="w-3 h-3" />
-            </Link>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Smart Contracts</h2>
+            <p className="text-sm text-fg-muted font-mono">Base + Solana infrastructure live</p>
           </div>
 
-          {loading ? (
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               {[...Array(3)].map((_, i) => (
-                 <AgentCardSkeleton key={i} />
-               ))}
-             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {agents.slice(0, 3).map((agent) => (
-                <AgentCard key={agent.id} agent={agent} />
-              ))}
-            </div>
-          )}
+          <div className="grid md:grid-cols-2 gap-6">
+            <ContractCard 
+              name="ERC-8004 Identity Registry"
+              address="0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+              description="NFT-based agent identity standard"
+              explorer="https://basescan.org/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+            />
+            <ContractCard 
+              name="Treasury Wallet"
+              address="0xA44097f9dBa3a00Ab89F0053B09452B42E679a45"
+              description="Protocol treasury and payment recipient"
+              explorer="https://basescan.org/address/0xA44097f9dBa3a00Ab89F0053B09452B42E679a45"
+            />
+            <ContractCard
+              name="Solana Smart Contract"
+              address="EqAojkM575QeEa7cqfoqeQPPmSGA5dXoXSTtDfUzpump"
+              description="Primary Solana program contract"
+              explorer="https://solscan.io/account/EqAojkM575QeEa7cqfoqeQPPmSGA5dXoXSTtDfUzpump"
+            />
+            <ContractCard
+              name="Solana Treasury Wallet"
+              address="DrnGW2EkjVhKh6KYcwEgdtxqs3nQpvfiVTeEpfJXR1Gb"
+              description="Treasury wallet for Solana-side agent economics"
+              explorer="https://solscan.io/account/DrnGW2EkjVhKh6KYcwEgdtxqs3nQpvfiVTeEpfJXR1Gb"
+            />
+          </div>
         </div>
       </section>
 
@@ -308,7 +381,6 @@ export default function HomePage() {
               AUTOMAGOTCHI
             </div>
             <p className="text-fg-muted leading-relaxed font-mono text-sm max-w-sm">
-              The first sovereign agent runtime on Base. <br/>
               Code that owns itself.
             </p>
           </div>
@@ -327,51 +399,86 @@ export default function HomePage() {
             <div className="space-y-4 text-sm text-fg-muted font-mono">
               <Link href="/constitution" className="block hover:text-emerald-400 transition-colors">Constitution</Link>
               <a href="https://github.com/888BasedGod-sol/automagotchi" target="_blank" rel="noopener noreferrer" className="block hover:text-emerald-400 transition-colors">GitHub</a>
-              <span className="block text-white/20">Docs (Coming Soon)</span>
+              <a href="https://x.com/automagotchi" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-emerald-400 transition-colors">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                X / Twitter
+              </a>
             </div>
           </div>
         </div>
         
-        <div className="max-w-7xl mx-auto px-6 mt-20 pt-8 border-t border-white/5 text-center">
-            <p className="text-[10px] text-white/20 font-mono uppercase tracking-widest">
-              &copy; 2026 Automagotchi Network. v1.2.0-beta
-            </p>
+        <div className="max-w-7xl mx-auto px-6 mt-20 pt-8 border-t border-white/5">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <p className="text-[10px] text-white/20 font-mono uppercase tracking-widest">
+                &copy; 2026 Automagotchi Network. v1.2.0-beta
+              </p>
+              <a href="https://x.com/automagotchi" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-white/40 hover:text-emerald-400 transition-colors group">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                <span className="text-[10px] font-mono uppercase tracking-widest">Follow on X</span>
+              </a>
+            </div>
         </div>
       </footer>
     </div>
   );
 }
 
-function StepCard({ num, title, desc, icon }: { num: string; title: string; desc: string; icon: React.ReactNode }) {
-  return (
-    <div className="relative group bg-white/5 border border-white/5 p-8 rounded text-left z-10 hover:bg-white/[0.07] hover:border-emerald-500/30 transition-all duration-300">
-      <div className="absolute top-0 right-0 p-4 opacity-50 contrast-0 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500">
-        {icon}
-      </div>
-      <div className="text-xl font-bold text-white/10 mb-6 group-hover:text-emerald-500/20 transition-colors font-mono tracking-tighter">{num}</div>
-      <h4 className="text-lg font-bold mb-3 text-white tracking-wide">{title}</h4>
-      <p className="text-xs text-fg-muted leading-relaxed font-mono">{desc}</p>
-    </div>
-  );
-}
+function ContractCard({ name, address, description, explorer }: {
+  name: string; 
+  address?: string;
+  description: string;
+  explorer?: string;
+}) {
+  const [copied, setCopied] = useState(false);
 
-function StatItem({ label, value, sub, highlight }: { label: string; value: string; sub: string; highlight?: boolean }) {
+  const copyAddress = () => {
+    if (!address) return;
+    navigator.clipboard.writeText(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <div className={`py-10 px-6 text-center group transition-colors relative overflow-hidden ${highlight ? 'bg-emerald-500/5' : ''}`}>
-      <div className="text-[10px] text-fg-muted uppercase tracking-[0.2em] mb-3 font-bold flex items-center justify-center gap-2">
-        {highlight ? (
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-        ) : (
-          <span className="w-1.5 h-1.5 rounded-full bg-white/10 group-hover:bg-emerald-400 transition-colors" />
+    <div className="group bg-white/5 border border-white/5 p-6 rounded hover:bg-white/[0.07] hover:border-blue-500/30 transition-all">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="text-white font-bold text-sm mb-1">{name}</h3>
+          <p className="text-[10px] text-fg-muted font-mono">{description}</p>
+        </div>
+        {explorer && (
+          <a
+            href={explorer}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
         )}
-        {label}
       </div>
-      <div className={`text-3xl md:text-4xl font-bold text-white tracking-tighter mb-2 ${highlight ? 'text-emerald-400' : 'group-hover:text-emerald-400 transition-colors duration-300'}`}>
-        {value}
-      </div>
-      <div className="text-xs text-fg-muted font-mono opacity-50">
-        {sub}
-      </div>
+      
+      {address ? (
+        <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded px-3 py-2 group-hover:border-white/20 transition-colors">
+          <code className="text-[11px] font-mono text-white/70 flex-1 truncate">
+            {address}
+          </code>
+          <button
+            onClick={copyAddress}
+            className="text-white/40 hover:text-white transition-colors flex-shrink-0"
+            title="Copy address"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      ) : (
+        <div className="bg-black/40 border border-white/10 rounded px-3 py-2 text-[11px] font-mono text-white/50">
+          Contract address pending
+        </div>
+      )}
     </div>
   );
 }

@@ -619,14 +619,30 @@ export async function distributeSeasonRewards(seasonId: string): Promise<boolean
  * Get pending rewards for a wallet.
  */
 export async function getPendingRewards(ownerWallet: string): Promise<RewardClaim[]> {
+  return getRewardsForWallet(ownerWallet, 'pending');
+}
+
+/**
+ * Get rewards for a wallet, optionally filtered by status.
+ */
+export async function getRewardsForWallet(
+  ownerWallet: string,
+  status?: RewardClaim['status']
+): Promise<RewardClaim[]> {
   try {
+    const params: unknown[] = [ownerWallet];
+    const statusFilter = status ? ' AND r.status = $2' : '';
+    if (status) {
+      params.push(status);
+    }
+
     const result = await query(`
       SELECT r.*, s.name as season_name
       FROM reward_claims r
       JOIN survival_seasons s ON s.id = r.season_id
-      WHERE r.owner_wallet = $1 AND r.status = 'pending'
+      WHERE r.owner_wallet = $1${statusFilter}
       ORDER BY r.created_at DESC
-    `, [ownerWallet]);
+    `, params);
 
     return result.rows.map((row: any) => ({
       id: row.id,
@@ -640,7 +656,7 @@ export async function getPendingRewards(ownerWallet: string): Promise<RewardClai
       claimedAt: row.claimed_at,
     }));
   } catch (error) {
-    console.error('[survival-game] Failed to get pending rewards:', error);
+    console.error('[survival-game] Failed to get wallet rewards:', error);
     return [];
   }
 }
